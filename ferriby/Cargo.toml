@@ -8,7 +8,7 @@ edition.workspace = true
 repository.workspace = true
 
 [dependencies]
-crossterm = { version = "0.28.1", features = ["event-stream"] }
+crossterm = { version = "0.29.0", features = ["event-stream"] }
 futures = { workspace = true }
 ratatui = "0.29.0"
 tokio = { workspace = true, features = ["full"] }
