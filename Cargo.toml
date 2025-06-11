@@ -1,0 +1,15 @@
+[workspace]
+members = ["ferriby", "ferriby-sources"]
+resolver = "2"
+
+
+[workspace.package]
+authors = ["dawe <dawedawe@posteo.de>"]
+license = "MIT"
+edition = "2024"
+repository = "https://github.com/dawedawe/ferriby"
+
+[workspace.dependencies]
+futures = "0.3.31"
+tokio = { version = "1.40.0", features = ["full"] }
+chrono = "0.4.41"

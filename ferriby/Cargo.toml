@@ -1,0 +1,17 @@
+[package]
+name = "ferriby"
+version = "0.1.0"
+description = "keep ferris alive by contributing to a git repo"
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+
+[dependencies]
+crossterm = { version = "0.28.1", features = ["event-stream"] }
+futures = { workspace = true }
+ratatui = "0.29.0"
+tokio = { workspace = true, features = ["full"] }
+color-eyre = "0.6.3"
+chrono = { workspace = true }
+ferriby-sources = { path = "../ferriby-sources", version = "0.1.0" }

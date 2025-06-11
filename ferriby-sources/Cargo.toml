@@ -1,0 +1,14 @@
+[package]
+name = "ferriby-sources"
+version = "0.1.0"
+description = "keep ferris alive by contributing to a git repo"
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+
+[dependencies]
+futures = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+chrono = { workspace = true }
+octocrab = "0.44.1"
