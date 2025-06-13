@@ -20,10 +20,11 @@ impl Widget for &App {
             .title_alignment(Alignment::Center)
             .border_type(BorderType::Rounded);
 
+        let happiness: String = self.happiness.into();
         let text = format!(
             "Press `Esc`, `Ctrl-C` or `q` to stop running.\n\
-                Happy: {}",
-            self.exists
+                Happiness level: {}",
+            happiness
         );
 
         let paragraph = Paragraph::new(text)
