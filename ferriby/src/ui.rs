@@ -1,3 +1,4 @@
+use crate::app::{App, Happiness};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Rect},
@@ -5,7 +6,42 @@ use ratatui::{
     widgets::{Block, BorderType, Paragraph, Widget},
 };
 
-use crate::app::App;
+fn ferris(happiness: Happiness) -> String {
+    let undecided_ferris = r"
+    _~^~^~_      
+\) /  o o  \ (/  
+  '_       _'    
+  \ '-----' /    
+";
+
+    let sad_ferris = r"
+    _~^~^~_       
+\) /  ~ ~  \ (/   
+  '_  / \  _'     
+  \ '-----' /     
+";
+
+    let okayish_ferris = r"
+    _~^~^~_       
+\) /  o o  \ (/   
+  '_  ---  _'     
+  \ '-----' /     
+";
+
+    let buzzing_ferris = r"
+    _~^~^~_       
+\/ /  O O  \ \/   
+  '_  \_/  _'     
+  \ '-----' /     
+";
+
+    match happiness {
+        Happiness::Undecided => undecided_ferris.into(),
+        Happiness::Sad => sad_ferris.into(),
+        Happiness::Okayish => okayish_ferris.into(),
+        Happiness::Buzzing => buzzing_ferris.into(),
+    }
+}
 
 impl Widget for &App {
     /// Renders the user interface widgets.
@@ -21,10 +57,12 @@ impl Widget for &App {
             .border_type(BorderType::Rounded);
 
         let happiness: String = self.happiness.into();
+        let ferris = ferris(self.happiness);
         let text = format!(
             "Press `Esc`, `Ctrl-C` or `q` to stop running.\n\
-                Happiness level: {}",
-            happiness
+             Happiness level: {}\n
+             {}",
+            happiness, ferris
         );
 
         let paragraph = Paragraph::new(text)
