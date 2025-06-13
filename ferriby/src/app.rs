@@ -21,7 +21,7 @@ impl Default for App {
         Self {
             running: true,
             exists: false,
-            events: EventHandler::new(),
+            events: EventHandler::new(60),
         }
     }
 }
@@ -29,7 +29,16 @@ impl Default for App {
 impl App {
     /// Constructs a new instance of [`App`].
     pub fn new() -> Self {
-        Self::default()
+        let gh_intervall_secs = match std::env::var("FERRIBY_GH_PAT") {
+            Ok(e) if !e.is_empty() => 5,
+            _ => 60,
+        };
+
+        Self {
+            running: true,
+            exists: false,
+            events: EventHandler::new(gh_intervall_secs),
+        }
     }
 
     /// Run the application's main loop.
@@ -69,8 +78,11 @@ impl App {
     /// The tick event is where you can update the state of your application with any logic that
     /// needs to be updated at a fixed frame rate. E.g. polling a server, updating an animation.
     async fn tick(&mut self) {
-        let last_event =
-            tokio::spawn(github::get_last_gh_repo_event("dawedawe", "nvim_config")).await;
+        let last_event = tokio::spawn(github::get_last_gh_repo_event(
+            "dawedawe",
+            "ferribytestrepo",
+        ))
+        .await;
         let last_event = last_event.unwrap();
         let happy = match last_event {
             Some(last_event) => {

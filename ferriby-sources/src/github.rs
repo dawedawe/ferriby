@@ -8,12 +8,14 @@ pub async fn get_last_gh_repo_event(
 ) -> Option<DateTime<Utc>> {
     let instance = octocrab::instance();
     let instance = match std::env::var("FERRIBY_GH_PAT") {
-        Ok(token) => Arc::new(instance.user_access_token(token).unwrap()),
-        Err(_) => instance,
+        Ok(token) if !token.is_empty() => Arc::new(instance.user_access_token(token).unwrap()),
+        _ => instance,
     };
 
-    let repo = instance.repos(owner, repo);
-    let r = repo.list_commits().send().await;
+    let owner: String = owner.into();
+    let repo: String = repo.into();
+    let repos = instance.repos(owner.clone(), repo.clone());
+    let r = repos.list_commits().send().await;
     match r {
         Ok(mut value) => {
             let items = value.take_items();
@@ -26,6 +28,12 @@ pub async fn get_last_gh_repo_event(
                     .max()
             }
         }
-        Err(_) => None,
+        Err(_) => {
+            panic!(
+                "Failed to list commits of github repo {}/{}. \
+                    This could mean we don't have access to it or there are no commits so far.",
+                owner, repo
+            );
+        }
     }
 }
