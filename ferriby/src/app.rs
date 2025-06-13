@@ -1,17 +1,56 @@
 use crate::event::{AppEvent, Event, EventHandler};
+use chrono::{DateTime, Utc};
 use ferriby_sources::github;
 use ratatui::{
     DefaultTerminal,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
 };
 
+#[derive(Debug, Clone, Copy)]
+pub enum Happiness {
+    Undecided,
+    Sad,
+    Okayish,
+    Buzzing,
+}
+
+impl Happiness {
+    fn from_last_activity(last_activity: Option<DateTime<Utc>>) -> Self {
+        if let Some(last_activity) = last_activity {
+            let now = chrono::Utc::now();
+            if now < last_activity {
+                panic!("commits from the future");
+            }
+            let diff = now - last_activity;
+            match diff {
+                _ if diff < chrono::TimeDelta::hours(1) => Happiness::Buzzing,
+                _ if diff < chrono::TimeDelta::hours(24 * 7) => Happiness::Okayish,
+                _ => Happiness::Sad,
+            }
+        } else {
+            Happiness::Undecided
+        }
+    }
+}
+
+impl From<Happiness> for String {
+    fn from(happiness: Happiness) -> Self {
+        match happiness {
+            Happiness::Undecided => "undecided".into(),
+            Happiness::Sad => "sad".into(),
+            Happiness::Okayish => "okayish".into(),
+            Happiness::Buzzing => "buzzing".into(),
+        }
+    }
+}
+
 /// Application.
 #[derive(Debug)]
 pub struct App {
     /// Is the application running?
     pub running: bool,
-    /// Signal.
-    pub exists: bool,
+    /// How happy we are.
+    pub happiness: Happiness,
     /// Event handler.
     pub events: EventHandler,
 }
@@ -20,8 +59,8 @@ impl Default for App {
     fn default() -> Self {
         Self {
             running: true,
-            exists: false,
             events: EventHandler::new(60),
+            happiness: Happiness::Okayish,
         }
     }
 }
@@ -36,8 +75,8 @@ impl App {
 
         Self {
             running: true,
-            exists: false,
             events: EventHandler::new(gh_intervall_secs),
+            happiness: Happiness::Okayish,
         }
     }
 
@@ -84,16 +123,7 @@ impl App {
         ))
         .await;
         let last_event = last_event.unwrap();
-        let happy = match last_event {
-            Some(last_event) => {
-                let now = chrono::Utc::now();
-                let diff = now - last_event;
-                diff < chrono::TimeDelta::hours(6)
-            }
-            None => false,
-        };
-
-        self.exists = happy;
+        self.happiness = Happiness::from_last_activity(last_event);
     }
 
     /// Set running to false to quit the application.
