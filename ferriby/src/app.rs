@@ -1,6 +1,6 @@
 use crate::event::{AppEvent, Event, EventHandler};
 use chrono::{DateTime, Utc};
-use ferriby_sources::github;
+use ferriby_sources::github::{self, GitHubSource};
 use ratatui::{
     DefaultTerminal,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
@@ -23,7 +23,7 @@ impl Happiness {
             }
             let diff = now - last_activity;
             match diff {
-                _ if diff < chrono::TimeDelta::hours(1) => Happiness::Buzzing,
+                _ if diff < chrono::TimeDelta::hours(24) => Happiness::Buzzing,
                 _ if diff < chrono::TimeDelta::hours(24 * 7) => Happiness::Okayish,
                 _ => Happiness::Sad,
             }
@@ -53,6 +53,8 @@ pub struct App {
     pub happiness: Happiness,
     /// Event handler.
     pub events: EventHandler,
+    /// GitHub source.
+    pub source: GitHubSource,
 }
 
 impl Default for App {
@@ -61,13 +63,17 @@ impl Default for App {
             running: true,
             events: EventHandler::new(60),
             happiness: Happiness::Okayish,
+            source: GitHubSource {
+                owner: "rust".into(),
+                repo: "rust".into(),
+            },
         }
     }
 }
 
 impl App {
     /// Constructs a new instance of [`App`].
-    pub fn new() -> Self {
+    pub fn new(source: GitHubSource) -> Self {
         let gh_intervall_secs = match std::env::var("FERRIBY_GH_PAT") {
             Ok(e) if !e.is_empty() => 5,
             _ => 60,
@@ -77,6 +83,7 @@ impl App {
             running: true,
             events: EventHandler::new(gh_intervall_secs),
             happiness: Happiness::Okayish,
+            source,
         }
     }
 
@@ -117,13 +124,13 @@ impl App {
     /// The tick event is where you can update the state of your application with any logic that
     /// needs to be updated at a fixed frame rate. E.g. polling a server, updating an animation.
     async fn tick(&mut self) {
-        let last_event = tokio::spawn(github::get_last_gh_repo_event(
-            "dawedawe",
-            "ferribytestrepo",
-        ))
-        .await;
-        let last_event = last_event.unwrap();
-        self.happiness = Happiness::from_last_activity(last_event);
+        let last_event = tokio::spawn(github::get_last_gh_repo_event(self.source.clone())).await;
+        match last_event {
+            Ok(last_event) => {
+                self.happiness = Happiness::from_last_activity(last_event);
+            }
+            Err(_) => self.running = false,
+        }
     }
 
     /// Set running to false to quit the application.

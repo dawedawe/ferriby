@@ -2,19 +2,29 @@ use std::sync::Arc;
 
 use chrono::{DateTime, offset::Utc};
 
-pub async fn get_last_gh_repo_event(
-    owner: impl Into<String>,
-    repo: impl Into<String>,
-) -> Option<DateTime<Utc>> {
+#[derive(Debug, Clone)]
+pub struct GitHubSource {
+    pub owner: String,
+    pub repo: String,
+}
+
+impl Default for GitHubSource {
+    fn default() -> Self {
+        Self {
+            owner: "rust-lang".into(),
+            repo: "rust".into(),
+        }
+    }
+}
+
+pub async fn get_last_gh_repo_event(source: GitHubSource) -> Option<DateTime<Utc>> {
     let instance = octocrab::instance();
     let instance = match std::env::var("FERRIBY_GH_PAT") {
         Ok(token) if !token.is_empty() => Arc::new(instance.user_access_token(token).unwrap()),
         _ => instance,
     };
 
-    let owner: String = owner.into();
-    let repo: String = repo.into();
-    let repos = instance.repos(owner.clone(), repo.clone());
+    let repos = instance.repos(source.owner.clone(), source.repo.clone());
     let r = repos.list_commits().send().await;
     match r {
         Ok(mut value) => {
@@ -32,7 +42,7 @@ pub async fn get_last_gh_repo_event(
             panic!(
                 "Failed to list commits of github repo {}/{}. \
                     This could mean we don't have access to it or there are no commits so far.",
-                owner, repo
+                source.owner, source.repo
             );
         }
     }
