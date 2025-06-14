@@ -12,3 +12,4 @@ futures = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 chrono = { workspace = true }
 octocrab = "0.44.1"
+git2 = "0.20.2"
