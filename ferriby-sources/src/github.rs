@@ -17,7 +17,7 @@ impl Default for GitHubSource {
     }
 }
 
-pub async fn get_last_gh_repo_event(source: GitHubSource) -> Option<DateTime<Utc>> {
+pub async fn get_last_event(source: GitHubSource) -> Option<DateTime<Utc>> {
     let instance = octocrab::instance();
     let instance = match std::env::var("FERRIBY_GH_PAT") {
         Ok(token) if !token.is_empty() => Arc::new(instance.user_access_token(token).unwrap()),

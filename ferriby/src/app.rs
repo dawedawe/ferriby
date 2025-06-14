@@ -1,10 +1,19 @@
 use crate::event::{AppEvent, Event, EventHandler};
 use chrono::{DateTime, Utc};
-use ferriby_sources::github::{self, GitHubSource};
+use ferriby_sources::{
+    git::{self, GitSource},
+    github::{self, GitHubSource},
+};
 use ratatui::{
     DefaultTerminal,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
 };
+
+#[derive(Debug, Clone)]
+pub enum Source {
+    GitHub(GitHubSource),
+    Git(GitSource),
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Happiness {
@@ -54,7 +63,7 @@ pub struct App {
     /// Event handler.
     pub events: EventHandler,
     /// GitHub source.
-    pub source: GitHubSource,
+    pub source: Source,
 }
 
 impl Default for App {
@@ -63,17 +72,14 @@ impl Default for App {
             running: true,
             events: EventHandler::new(60),
             happiness: Happiness::Okayish,
-            source: GitHubSource {
-                owner: "rust".into(),
-                repo: "rust".into(),
-            },
+            source: Source::Git(GitSource::default()),
         }
     }
 }
 
 impl App {
     /// Constructs a new instance of [`App`].
-    pub fn new(source: GitHubSource) -> Self {
+    pub fn new(source: Source) -> Self {
         let gh_intervall_secs = match std::env::var("FERRIBY_GH_PAT") {
             Ok(e) if !e.is_empty() => 5,
             _ => 60,
@@ -124,7 +130,10 @@ impl App {
     /// The tick event is where you can update the state of your application with any logic that
     /// needs to be updated at a fixed frame rate. E.g. polling a server, updating an animation.
     async fn tick(&mut self) {
-        let last_event = tokio::spawn(github::get_last_gh_repo_event(self.source.clone())).await;
+        let last_event = match &self.source {
+            Source::GitHub(source) => tokio::spawn(github::get_last_event(source.clone())).await,
+            Source::Git(source) => tokio::spawn(git::get_last_event(source.clone())).await,
+        };
         match last_event {
             Ok(last_event) => {
                 self.happiness = Happiness::from_last_activity(last_event);
