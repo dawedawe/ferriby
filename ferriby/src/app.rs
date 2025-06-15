@@ -80,15 +80,16 @@ impl Default for App {
 impl App {
     /// Constructs a new instance of [`App`].
     pub fn new(source: Source) -> Self {
-        let gh_intervall_secs = match std::env::var("FERRIBY_GH_PAT") {
-            Ok(e) if !e.is_empty() => 5,
+        let intervall_secs = match (&source, std::env::var("FERRIBY_GH_PAT")) {
+            (Source::Git(_), _) => 3,
+            (Source::GitHub(_), Ok(e)) if !e.is_empty() => 5,
             _ => 60,
         };
 
         Self {
             running: true,
-            events: EventHandler::new(gh_intervall_secs),
-            happiness: Happiness::Okayish,
+            events: EventHandler::new(intervall_secs),
+            happiness: Happiness::Undecided,
             source,
         }
     }
