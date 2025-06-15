@@ -27,9 +27,10 @@ pub async fn get_last_event(source: GitSource) -> Option<DateTime<Utc>> {
         Err(e) => panic!("failed to get revwalk: {}", e),
     };
 
-    let _ = revwalk
-        .push_head()
-        .inspect_err(|e| panic!("push_head() failed: {}", e));
+    if revwalk.push_head().is_err() {
+        // repo without commits
+        return None;
+    }
 
     match revwalk.next() {
         Some(Ok(oid)) => match repo.find_commit(oid) {

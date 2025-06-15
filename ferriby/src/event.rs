@@ -13,6 +13,8 @@ pub enum Event {
     /// event. e.g. polling exernal systems, updating animations, or rendering the UI based on a
     /// fixed frame rate.
     Tick,
+    /// Event emitted when it's time to animate ferris
+    AnimationTick,
     /// Crossterm events.
     ///
     /// These events are emitted by the terminal.
@@ -103,18 +105,28 @@ impl EventTask {
     ///
     /// This function emits tick events at a fixed rate and polls for crossterm events in between.
     async fn run(self) -> color_eyre::Result<()> {
-        let tick_rate = Duration::from_secs_f64(self.intervall_secs as f64);
         let mut reader = crossterm::event::EventStream::new();
+
+        let tick_rate = Duration::from_secs_f64(self.intervall_secs as f64);
+        let animation_tick_rate = Duration::from_secs_f64(0.7);
+
         let mut tick = tokio::time::interval(tick_rate);
+        let mut animation_tick = tokio::time::interval(animation_tick_rate);
+
         loop {
-            let tick_delay = tick.tick();
             let crossterm_event = reader.next().fuse();
+            let tick_delay = tick.tick();
+            let animation_tick_delay = animation_tick.tick();
+
             tokio::select! {
               _ = self.sender.closed() => {
                 break;
               }
               _ = tick_delay => {
                 self.send(Event::Tick);
+              }
+              _ = animation_tick_delay => {
+                self.send(Event::AnimationTick);
               }
               Some(Ok(evt)) = crossterm_event => {
                 self.send(Event::Crossterm(evt));

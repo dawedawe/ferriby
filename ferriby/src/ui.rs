@@ -6,34 +6,92 @@ use ratatui::{
     widgets::{Block, BorderType, Paragraph, Widget},
 };
 
-fn ferris(happiness: Happiness) -> String {
-    let undecided_ferris = r"
+fn ferris(happiness: Happiness, animation: usize) -> String {
+    let undecided_ferris = {
+        let ferrises = [
+            r"
     _~^~^~_      
-\) /  o o  \ (/  
+   / o  o  \     
   '_       _'    
   \ '-----' /    
-";
+",
+            r"
+    _~^~^~_      
+   /  o  o \     
+  '_       _'    
+  \ '-----' /    
+",
+        ];
+        ferrises[animation % ferrises.len()]
+    };
 
-    let sad_ferris = r"
+    let sad_ferris = {
+        let ferrises = [
+            r"
     _~^~^~_       
-\) /  ~ ~  \ (/   
+\) / .  .  \ (/   
   '_  / \  _'     
-  \ '-----' /     
-";
+  \ '-----' \     
+",
+            r"
+    _~^~^~_       
+\) /  .  . \ (/   
+  '_  / \  _'     
+  / '-----' /     
+",
+        ];
+        ferrises[animation % ferrises.len()]
+    };
 
-    let okayish_ferris = r"
+    let okayish_ferris = {
+        let ferrises = [
+            r"
     _~^~^~_       
 \) /  o o  \ (/   
-  '_  ---  _'     
+  '_   ==  _'     
   \ '-----' /     
-";
-
-    let buzzing_ferris = r"
+",
+            r"
     _~^~^~_       
-\/ /  O O  \ \/   
+\) /  o o  \ (/   
+  '_  ==   _'     
+  \ '-----' /     
+",
+        ];
+
+        ferrises[animation % ferrises.len()]
+    };
+
+    let buzzing_ferris = {
+        let ferrises = [
+            r"
+    _~^~^~_       
+\/ /  o O  \ \/   
   '_  \_/  _'     
   \ '-----' /     
-";
+",
+            r"
+\/  _~^^^~_  \/   
+ \ /  O o  \ /    
+  '_  *o*  _'     
+  / '-----' \     
+",
+            r"
+    _~^~^~_       
+\/ /  o O  \ \/   
+  '_  \_/  _'     
+  \ '-----' /     
+",
+            r"
+    _~^~^~_       
+\  /  O -  \  /   
+  '_  \_/  _'     
+  \ '-----' /     
+",
+        ];
+
+        ferrises[animation % ferrises.len()]
+    };
 
     match happiness {
         Happiness::Undecided => undecided_ferris.into(),
@@ -57,7 +115,7 @@ impl Widget for &App {
             .border_type(BorderType::Rounded);
 
         let happiness: String = self.happiness.into();
-        let ferris = ferris(self.happiness);
+        let ferris = ferris(self.happiness, self.animation);
         let text = format!(
             "Press `Esc`, `Ctrl-C` or `q` to stop running.\n\
              Happiness level: {}\n
