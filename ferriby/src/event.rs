@@ -43,9 +43,9 @@ pub struct EventHandler {
 
 impl EventHandler {
     /// Constructs a new instance of [`EventHandler`] and spawns a new thread to handle events.
-    pub fn new(gh_intervall_secs: u32) -> Self {
+    pub fn new(intervall_secs: u32) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        let actor = EventTask::new(sender.clone(), gh_intervall_secs);
+        let actor = EventTask::new(sender.clone(), intervall_secs);
         tokio::spawn(async { actor.run().await });
         Self { sender, receiver }
     }
@@ -87,15 +87,15 @@ impl Default for EventHandler {
 struct EventTask {
     /// Event sender channel.
     sender: mpsc::UnboundedSender<Event>,
-    gh_intervall_secs: u32,
+    intervall_secs: u32,
 }
 
 impl EventTask {
     /// Constructs a new instance of [`EventThread`].
-    fn new(sender: mpsc::UnboundedSender<Event>, gh_intervall_secs: u32) -> Self {
+    fn new(sender: mpsc::UnboundedSender<Event>, intervall_secs: u32) -> Self {
         Self {
             sender,
-            gh_intervall_secs,
+            intervall_secs,
         }
     }
 
@@ -103,7 +103,7 @@ impl EventTask {
     ///
     /// This function emits tick events at a fixed rate and polls for crossterm events in between.
     async fn run(self) -> color_eyre::Result<()> {
-        let tick_rate = Duration::from_secs_f64(self.gh_intervall_secs as f64);
+        let tick_rate = Duration::from_secs_f64(self.intervall_secs as f64);
         let mut reader = crossterm::event::EventStream::new();
         let mut tick = tokio::time::interval(tick_rate);
         loop {
