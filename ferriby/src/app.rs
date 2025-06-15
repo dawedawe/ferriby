@@ -64,6 +64,8 @@ pub struct App {
     pub events: EventHandler,
     /// GitHub source.
     pub source: Source,
+    /// Which animation to show.
+    pub animation: usize,
 }
 
 impl Default for App {
@@ -73,6 +75,7 @@ impl Default for App {
             events: EventHandler::new(60),
             happiness: Happiness::Okayish,
             source: Source::Git(GitSource::default()),
+            animation: 0,
         }
     }
 }
@@ -91,6 +94,7 @@ impl App {
             events: EventHandler::new(intervall_secs),
             happiness: Happiness::Undecided,
             source,
+            animation: 0,
         }
     }
 
@@ -100,6 +104,7 @@ impl App {
             terminal.draw(|frame| frame.render_widget(&self, frame.area()))?;
             match self.events.next().await? {
                 Event::Tick => self.tick().await,
+                Event::AnimationTick => self.animation_tick(),
                 Event::Crossterm(event) => {
                     if let crossterm::event::Event::Key(key_event) = event {
                         self.handle_key_events(key_event)?
@@ -127,9 +132,6 @@ impl App {
     }
 
     /// Handles the tick event of the terminal.
-    ///
-    /// The tick event is where you can update the state of your application with any logic that
-    /// needs to be updated at a fixed frame rate. E.g. polling a server, updating an animation.
     async fn tick(&mut self) {
         let last_event = match &self.source {
             Source::GitHub(source) => tokio::spawn(github::get_last_event(source.clone())).await,
@@ -141,6 +143,11 @@ impl App {
             }
             Err(_) => self.running = false,
         }
+    }
+
+    /// Handles the animation_tick event of the terminal.
+    fn animation_tick(&mut self) {
+        self.animation = self.animation.wrapping_add(1);
     }
 
     /// Set running to false to quit the application.
