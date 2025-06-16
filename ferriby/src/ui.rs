@@ -10,16 +10,16 @@ fn ferris(happiness: Happiness, animation: usize) -> String {
     let undecided_ferris = {
         let ferrises = [
             r"
-    _~^~^~_      
-   / o  o  \     
-  '_       _'    
-  \ '-----' /    
+    _~^~^~_        
+   / o  o  \       
+  '_       _'      
+  \ '-----' /      
 ",
             r"
-    _~^~^~_      
-   /  o  o \     
-  '_       _'    
-  \ '-----' /    
+    _~^~^~_       
+   /  o  o \      
+  '_       _'     
+  \ '-----' /     
 ",
         ];
         ferrises[animation % ferrises.len()]
@@ -118,9 +118,10 @@ impl Widget for &App {
         let ferris = ferris(self.happiness, self.animation);
         let text = format!(
             "Press `Esc`, `Ctrl-C` or `q` to stop running.\n\
-             Happiness level: {}\n
+             Source: {}\n\
+             Happiness level: {}\n\
              {}",
-            happiness, ferris
+            self.source, happiness, ferris
         );
 
         let paragraph = Paragraph::new(text)

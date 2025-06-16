@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::event::{AppEvent, Event, EventHandler};
 use chrono::{DateTime, Utc};
 use ferriby_sources::{
@@ -13,6 +15,15 @@ use ratatui::{
 pub enum Source {
     GitHub(GitHubSource),
     Git(GitSource),
+}
+
+impl Display for Source {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Source::GitHub(gh_source) => write!(f, "{}/{}", gh_source.owner, gh_source.repo),
+            Source::Git(git_source) => write!(f, "{}", git_source.path),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -153,5 +164,30 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ferriby_sources::github::GitHubSource;
+
+    #[test]
+    fn github_display() {
+        let source = Source::GitHub(GitHubSource {
+            owner: "owner_name".into(),
+            repo: "repo_name".into(),
+        });
+        let s = format!("{}", source);
+        assert_eq!("owner_name/repo_name", s);
+    }
+
+    #[test]
+    fn git_display() {
+        let source = Source::Git(GitSource {
+            path: "abc/cde/fgh".into(),
+        });
+        let s = format!("{}", source);
+        assert_eq!("abc/cde/fgh", s);
     }
 }
