@@ -19,9 +19,14 @@ async fn main() -> color_eyre::Result<()> {
     }
     let source = {
         if args.len() == 3 {
+            let pat = match std::env::var("FERRIBY_GH_PAT") {
+                Ok(token) if !token.is_empty() => Some(token),
+                _ => None,
+            };
             let github_source = GitHubSource {
                 owner: args[1].clone(),
                 repo: args[2].clone(),
+                pat,
             };
             Source::GitHub(github_source)
         } else {

@@ -177,6 +177,7 @@ mod tests {
         let source = Source::GitHub(GitHubSource {
             owner: "owner_name".into(),
             repo: "repo_name".into(),
+            pat: None,
         });
         let s = format!("{}", source);
         assert_eq!("owner_name/repo_name", s);
