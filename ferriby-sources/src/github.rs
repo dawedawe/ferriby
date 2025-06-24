@@ -2,9 +2,9 @@ use std::cell::LazyCell;
 
 use chrono::NaiveDateTime;
 use chrono::{DateTime, offset::Utc};
-use http::{self, header};
-use http_body_util::BodyExt;
+use http::{self, Method, header};
 use regex::Regex;
+use reqwest::Url;
 
 #[derive(Debug, Clone)]
 pub struct GitHubSource {
@@ -28,15 +28,22 @@ pub async fn get_last_event(source: GitHubSource) -> Option<DateTime<Utc>> {
         "https://api.github.com/repos/{}/{}/activity",
         source.owner, source.repo
     );
+    let url = Url::parse(url.as_str()).expect("Url creation failed");
+    let mut request = reqwest::Request::new(Method::GET, url);
 
-    let instance = octocrab::instance();
-
-    let mut headers = header::HeaderMap::new();
+    let headers = request.headers_mut();
+    headers.insert(
+        header::USER_AGENT,
+        header::HeaderValue::from_static("ferriby"),
+    );
     headers.insert(
         header::ACCEPT,
         header::HeaderValue::from_static("application/vnd.github+json"),
     );
-
+    headers.insert(
+        "X-GitHub-Api-Version",
+        header::HeaderValue::from_static("2022-11-28"),
+    );
     if let Some(token) = source.pat {
         let token = token.clone();
         let gh_pat = header::HeaderValue::from_str(format!("Bearer {token}").as_str())
@@ -44,24 +51,10 @@ pub async fn get_last_event(source: GitHubSource) -> Option<DateTime<Utc>> {
         headers.insert(header::AUTHORIZATION, gh_pat);
     }
 
-    headers.insert(
-        "X-GitHub-Api-Version",
-        header::HeaderValue::from_static("2022-11-28"),
-    );
-
-    let response = instance
-        ._get_with_headers(url, Some(headers))
-        .await
-        .unwrap();
-
-    if response.status() != http::StatusCode::OK {
-        panic!("http response not OK: {}", response.status());
-    }
-
-    let (_parts, body) = response.into_parts();
-    let bytes = body.collect().await.unwrap();
-    let bytes = bytes.to_bytes();
-    let body_str = std::str::from_utf8(&bytes).unwrap();
+    let client = reqwest::Client::new();
+    let response = client.execute(request).await.expect("http request failed");
+    let bytes = response.bytes().await.expect("bytes() failed");
+    let body_str = std::str::from_utf8(&bytes).expect("from_utf8() failed");
     let timestamps = parse_timestamps(body_str.to_string());
     timestamps.into_iter().max()
 }
