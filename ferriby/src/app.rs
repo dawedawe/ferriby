@@ -73,8 +73,10 @@ pub struct App {
     pub happiness: Happiness,
     /// Event handler.
     pub events: EventHandler,
-    /// GitHub source.
-    pub source: Source,
+    /// Repos to monitor.
+    pub sources: Vec<Source>,
+    /// The currently selected repo.
+    pub selected: usize,
     /// Which animation to show.
     pub animation: usize,
 }
@@ -85,7 +87,8 @@ impl Default for App {
             running: true,
             events: EventHandler::new(60),
             happiness: Happiness::Okayish,
-            source: Source::Git(GitSource::default()),
+            sources: vec![],
+            selected: 0,
             animation: 0,
         }
     }
@@ -104,7 +107,8 @@ impl App {
             running: true,
             events: EventHandler::new(intervall_secs),
             happiness: Happiness::Undecided,
-            source,
+            sources: vec![source],
+            selected: 0,
             animation: 0,
         }
     }
@@ -136,7 +140,18 @@ impl App {
             KeyCode::Char('c' | 'C') if key_event.modifiers == KeyModifiers::CONTROL => {
                 self.events.send(AppEvent::Quit)
             }
-            // Other handlers you could add here.
+            KeyCode::Down => {
+                self.selected = (self.selected + 1) % self.sources.len();
+            }
+            KeyCode::Up => {
+                self.selected = {
+                    if self.selected == 0 {
+                        self.sources.len() - 1
+                    } else {
+                        self.selected.saturating_sub(1)
+                    }
+                };
+            }
             _ => {}
         }
         Ok(())
@@ -144,7 +159,7 @@ impl App {
 
     /// Handles the tick event of the terminal.
     async fn tick(&mut self) {
-        let last_event = match &self.source {
+        let last_event = match &self.sources[self.selected] {
             Source::GitHub(source) => tokio::spawn(github::get_last_event(source.clone())).await,
             Source::Git(source) => tokio::spawn(git::get_last_event(source.clone())).await,
         };
