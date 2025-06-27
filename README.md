@@ -1,9 +1,9 @@
 # ferriby
 
-Keep ferris alive and happy by feeding them commits in your repositories.  
+Keep Ferrises alive and happy by feeding them commits in your repositories.  
 They can live in a local or a GitHub repository.
 
-# Usage:
+## Usage
 
 ```shell
 ferriby <owner> <repository>
@@ -13,10 +13,10 @@ ferriby <owner> <repository>
 ferriby <path_to_local_repository>
 ```
 
-# Configuration
+## Configuration
 
-To access private GitHub repos or to have a higher rate limit for the checks, you can pass a PAT (Personal Access Token) to ferriby 
-via the environment variable `FERRIBY_GH_PAT`.
+To access private GitHub repos or to have a higher rate limit for the checks,
+you can pass a PAT (Personal Access Token) to ferriby via the environment variable `FERRIBY_GH_PAT`.  
 Create your PAT in the [settings section](https://github.com/settings/personal-access-tokens) with `Repository permissions` of `Read`.
 Test it with
 
@@ -24,7 +24,11 @@ Test it with
 FERRIBY_GH_PAT="xyz" ferriby owner repository
 ```
 
-# Credits
+## Advisory
+
+This is gamification. If you have a human to love or a dog to walk, do that!
+
+## Credits
 
 The ASCII art is based on work by [Diggory Blake](https://github.com/diggsey). Thanks!
 
