@@ -96,18 +96,17 @@ impl Default for App {
 
 impl App {
     /// Constructs a new instance of [`App`].
-    pub fn new(source: Source) -> Self {
-        let intervall_secs = match (&source, std::env::var("FERRIBY_GH_PAT")) {
-            (Source::Git(_), _) => 3,
-            (Source::GitHub(_), Ok(e)) if !e.is_empty() => 5,
-            _ => 60,
+    pub fn new(sources: Vec<Source>) -> Self {
+        let intervall_secs = {
+            let gh_wo_pat = sources.iter().find(|source| matches!(source, Source::GitHub(GitHubSource { owner: _, repo: _, pat }) if pat.is_none()));
+            if gh_wo_pat.is_some() { 60 } else { 5 } // ToDo intervall per source
         };
 
         Self {
             running: true,
             events: EventHandler::new(intervall_secs),
             happiness: Happiness::Undecided,
-            sources: vec![source],
+            sources,
             selected: 0,
             animation: 0,
         }
@@ -141,9 +140,11 @@ impl App {
                 self.events.send(AppEvent::Quit)
             }
             KeyCode::Down => {
+                self.happiness = Happiness::Undecided;
                 self.selected = (self.selected + 1) % self.sources.len();
             }
             KeyCode::Up => {
+                self.happiness = Happiness::Undecided;
                 self.selected = {
                     if self.selected == 0 {
                         self.sources.len() - 1
