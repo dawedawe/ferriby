@@ -9,24 +9,31 @@ pub mod ui;
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
-    let sources = parse_args();
-    let terminal = ratatui::init();
-    let result = App::new(sources).run(terminal).await;
-    ratatui::restore();
-    result
+    let args: Vec<String> = env::args().collect();
+    match parse_args(&args) {
+        Ok(sources) => {
+            let terminal = ratatui::init();
+            let result = App::new(sources).run(terminal).await;
+            ratatui::restore();
+            result
+        }
+        Err(e) => {
+            eprintln!("{e}");
+            usage(args[0].clone());
+        }
+    }
 }
 
-fn parse_args() -> Vec<Source> {
-    let args: Vec<String> = env::args().collect();
+fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
     if args.len() < 3 {
-        usage(args[0].clone())
+        return Err("arguments missing".into());
     }
 
     let chunks = args[1..].chunks(2);
     let mut sources = vec![];
     for chunk in chunks {
         if chunk.len() != 2 {
-            usage(args[0].clone());
+            return Err("argument missing".into());
         }
 
         let source = if chunk[0] == "-gh" {
@@ -47,12 +54,12 @@ fn parse_args() -> Vec<Source> {
             };
             Source::Git(git_source)
         } else {
-            usage(args[0].clone());
+            return Err("unknown argument".into());
         };
         sources.push(source);
     }
 
-    sources
+    Ok(sources)
 }
 
 fn usage(name: String) -> ! {
@@ -61,4 +68,72 @@ fn usage(name: String) -> ! {
         name
     );
     std::process::exit(1);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_args_returns_err_for_empty_args() {
+        let args = vec!["ferriby".into()];
+        let sources = parse_args(&args);
+        assert!(sources.is_err());
+    }
+
+    #[test]
+    fn parse_args_returns_err_for_missing_arg() {
+        let args = vec!["ferriby".into(), "-gh".into()];
+        let sources = parse_args(&args);
+        assert!(sources.is_err());
+    }
+
+    #[test]
+    fn parse_args_returns_err_for_unknown_arg() {
+        let args = vec!["ferriby".into(), "-xxx".into()];
+        let sources = parse_args(&args);
+        assert!(sources.is_err());
+    }
+
+    #[test]
+    fn parse_args_returns_sources() {
+        let args = vec![
+            "ferriby".into(),
+            "-gh".into(),
+            "owner1/repo1".into(),
+            "-g".into(),
+            "dir1/repo2".into(),
+            "-gh".into(),
+            "owner2/repo3".into(),
+        ];
+        let sources = parse_args(&args);
+
+        assert!(sources.is_ok());
+        let sources = sources.unwrap();
+        assert_eq!(sources.len(), 3);
+
+        if let Source::GitHub(GitHubSource {
+            owner,
+            repo,
+            pat: _,
+        }) = &sources[0]
+        {
+            assert_eq!(owner, "owner1");
+            assert_eq!(repo, "repo1");
+        }
+
+        if let Source::Git(GitSource { path }) = &sources[1] {
+            assert_eq!(path, "dir1/repo2");
+        }
+
+        if let Source::GitHub(GitHubSource {
+            owner,
+            repo,
+            pat: _,
+        }) = &sources[2]
+        {
+            assert_eq!(owner, "owner2");
+            assert_eq!(repo, "repo3");
+        }
+    }
 }
