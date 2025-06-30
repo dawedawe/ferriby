@@ -42,6 +42,9 @@ fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
                 _ => None,
             };
             let gh_arg: Vec<&str> = chunk[1].split("/").collect();
+            if gh_arg.len() < 2 {
+                return Err("Invalid GitHub argument format. Expected 'owner/repo'.".into());
+            }
             let github_source = GitHubSource {
                 owner: gh_arg[0].to_string(),
                 repo: gh_arg[1].to_string(),
