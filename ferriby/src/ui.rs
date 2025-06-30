@@ -1,9 +1,9 @@
 use crate::app::{App, Happiness};
 use ratatui::{
     buffer::Buffer,
-    layout::{Alignment, Rect},
-    style::{Color, Stylize},
-    widgets::{Block, BorderType, Paragraph, Widget},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
+    widgets::{Block, BorderType, List, ListItem, ListState, Paragraph, StatefulWidget, Widget},
 };
 
 fn ferris(happiness: Happiness, animation: usize) -> String {
@@ -101,16 +101,32 @@ fn ferris(happiness: Happiness, animation: usize) -> String {
     }
 }
 
-impl Widget for &App {
-    /// Renders the user interface widgets.
-    ///
-    // This is where you add new widgets.
-    // See the following resources:
-    // - https://docs.rs/ratatui/latest/ratatui/widgets/index.html
-    // - https://github.com/ratatui/ratatui/tree/master/examples
-    fn render(self, area: Rect, buf: &mut Buffer) {
+impl App {
+    fn get_style() -> Style {
+        Style::default().fg(Color::Cyan).bg(Color::Black)
+    }
+
+    fn render_list(&self, area: Rect, buf: &mut Buffer) {
         let block = Block::bordered()
-            .title(" ferriby ")
+            .title(" Sources ")
+            .title_alignment(Alignment::Center)
+            .border_type(BorderType::Rounded);
+
+        let items = self.sources.iter().map(|source| {
+            let s: String = format!("{source}");
+            ListItem::new(s)
+        });
+
+        let list = List::new(items)
+            .block(block)
+            .style(App::get_style())
+            .highlight_symbol(">> ");
+        let mut list_state = ListState::default().with_selected(Some(self.selected));
+        StatefulWidget::render(list, area, buf, &mut list_state);
+    }
+    fn render_ferris(&self, area: Rect, buf: &mut Buffer) {
+        let block = Block::bordered()
+            .title(" Ferriby ")
             .title_alignment(Alignment::Center)
             .border_type(BorderType::Rounded);
 
@@ -121,15 +137,26 @@ impl Widget for &App {
              Source: {}\n\
              Happiness level: {}\n\
              {}",
-            self.source, happiness, ferris
+            self.sources[self.selected], happiness, ferris
         );
 
-        let paragraph = Paragraph::new(text)
+        Paragraph::new(text)
             .block(block)
-            .fg(Color::Cyan)
-            .bg(Color::Black)
-            .centered();
+            .style(App::get_style())
+            .centered()
+            .render(area, buf);
+    }
+}
 
-        paragraph.render(area, buf);
+impl Widget for &App {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(2)
+            .constraints([Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)])
+            .split(area);
+
+        self.render_list(chunks[0], buf);
+        self.render_ferris(chunks[1], buf);
     }
 }

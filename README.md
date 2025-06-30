@@ -6,11 +6,17 @@ They can live in a local or a GitHub repository.
 ## Usage
 
 ```shell
-ferriby <owner> <repository>
+ferriby -gh <owner>/<repository>
 ```
 
 ```shell
-ferriby <path_to_local_repository>
+ferriby -g <path_to_local_repository>
+```
+
+You can use ferriby with multiple repositories at once
+
+```shell
+ferriby -g <path_to_local_repo1> -gh <owner>/<repo1> -gh <owner2>/<repo2> -g <path_to_local_repo2>
 ```
 
 ## Configuration

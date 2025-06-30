@@ -73,8 +73,10 @@ pub struct App {
     pub happiness: Happiness,
     /// Event handler.
     pub events: EventHandler,
-    /// GitHub source.
-    pub source: Source,
+    /// Repos to monitor.
+    pub sources: Vec<Source>,
+    /// The currently selected repo.
+    pub selected: usize,
     /// Which animation to show.
     pub animation: usize,
 }
@@ -83,9 +85,10 @@ impl Default for App {
     fn default() -> Self {
         Self {
             running: true,
-            events: EventHandler::new(60),
-            happiness: Happiness::Okayish,
-            source: Source::Git(GitSource::default()),
+            events: EventHandler::new(None, None),
+            happiness: Happiness::Undecided,
+            sources: vec![],
+            selected: 0,
             animation: 0,
         }
     }
@@ -93,18 +96,30 @@ impl Default for App {
 
 impl App {
     /// Constructs a new instance of [`App`].
-    pub fn new(source: Source) -> Self {
-        let intervall_secs = match (&source, std::env::var("FERRIBY_GH_PAT")) {
-            (Source::Git(_), _) => 3,
-            (Source::GitHub(_), Ok(e)) if !e.is_empty() => 5,
-            _ => 60,
+    pub fn new(sources: Vec<Source>) -> Self {
+        let git_intervall_secs = sources
+            .iter()
+            .find(|source| matches!(source, Source::Git(_)))
+            .map(|_| 5);
+
+        let gh_intervall_secs = {
+            let gh_source = sources.iter().find_map(|source| match source {
+                Source::GitHub(x) => Some(x),
+                _ => None,
+            });
+            match gh_source {
+                Some(gh_source) if gh_source.pat.is_some() => Some(5),
+                Some(_) => Some(60),
+                _ => None,
+            }
         };
 
         Self {
             running: true,
-            events: EventHandler::new(intervall_secs),
+            events: EventHandler::new(git_intervall_secs, gh_intervall_secs),
             happiness: Happiness::Undecided,
-            source,
+            sources,
+            selected: 0,
             animation: 0,
         }
     }
@@ -136,7 +151,20 @@ impl App {
             KeyCode::Char('c' | 'C') if key_event.modifiers == KeyModifiers::CONTROL => {
                 self.events.send(AppEvent::Quit)
             }
-            // Other handlers you could add here.
+            KeyCode::Down => {
+                self.happiness = Happiness::Undecided;
+                self.selected = (self.selected + 1) % self.sources.len();
+            }
+            KeyCode::Up => {
+                self.happiness = Happiness::Undecided;
+                self.selected = {
+                    if self.selected == 0 {
+                        self.sources.len() - 1
+                    } else {
+                        self.selected.saturating_sub(1)
+                    }
+                };
+            }
             _ => {}
         }
         Ok(())
@@ -144,7 +172,7 @@ impl App {
 
     /// Handles the tick event of the terminal.
     async fn tick(&mut self) {
-        let last_event = match &self.source {
+        let last_event = match &self.sources[self.selected] {
             Source::GitHub(source) => tokio::spawn(github::get_last_event(source.clone())).await,
             Source::Git(source) => tokio::spawn(git::get_last_event(source.clone())).await,
         };
