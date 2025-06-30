@@ -85,8 +85,8 @@ impl Default for App {
     fn default() -> Self {
         Self {
             running: true,
-            events: EventHandler::new(60),
-            happiness: Happiness::Okayish,
+            events: EventHandler::new(None, None),
+            happiness: Happiness::Undecided,
             sources: vec![],
             selected: 0,
             animation: 0,
@@ -97,14 +97,26 @@ impl Default for App {
 impl App {
     /// Constructs a new instance of [`App`].
     pub fn new(sources: Vec<Source>) -> Self {
-        let intervall_secs = {
-            let gh_wo_pat = sources.iter().find(|source| matches!(source, Source::GitHub(GitHubSource { owner: _, repo: _, pat }) if pat.is_none()));
-            if gh_wo_pat.is_some() { 60 } else { 5 } // ToDo intervall per source
+        let git_intervall_secs = sources
+            .iter()
+            .find(|source| matches!(source, Source::Git(_)))
+            .map(|_| 5);
+
+        let gh_intervall_secs = {
+            let gh_source = sources.iter().find_map(|source| match source {
+                Source::GitHub(x) => Some(x),
+                _ => None,
+            });
+            match gh_source {
+                Some(gh_source) if gh_source.pat.is_some() => Some(5),
+                Some(_) => Some(60),
+                _ => None,
+            }
         };
 
         Self {
             running: true,
-            events: EventHandler::new(intervall_secs),
+            events: EventHandler::new(git_intervall_secs, gh_intervall_secs),
             happiness: Happiness::Undecided,
             sources,
             selected: 0,

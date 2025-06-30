@@ -45,9 +45,9 @@ pub struct EventHandler {
 
 impl EventHandler {
     /// Constructs a new instance of [`EventHandler`] and spawns a new thread to handle events.
-    pub fn new(intervall_secs: u32) -> Self {
+    pub fn new(git_intervall_secs: Option<u32>, gh_intervall_secs: Option<u32>) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        let actor = EventTask::new(sender.clone(), intervall_secs);
+        let actor = EventTask::new(sender.clone(), git_intervall_secs, gh_intervall_secs);
         tokio::spawn(async { actor.run().await });
         Self { sender, receiver }
     }
@@ -81,7 +81,7 @@ impl EventHandler {
 
 impl Default for EventHandler {
     fn default() -> Self {
-        Self::new(60)
+        Self::new(None, None)
     }
 }
 
@@ -89,15 +89,51 @@ impl Default for EventHandler {
 struct EventTask {
     /// Event sender channel.
     sender: mpsc::UnboundedSender<Event>,
-    intervall_secs: u32,
+    git_intervall_secs: Option<u32>,
+    gh_intervall_secs: Option<u32>,
 }
 
 impl EventTask {
     /// Constructs a new instance of [`EventThread`].
-    fn new(sender: mpsc::UnboundedSender<Event>, intervall_secs: u32) -> Self {
+    fn new(
+        sender: mpsc::UnboundedSender<Event>,
+        git_intervall_secs: Option<u32>,
+        gh_intervall_secs: Option<u32>,
+    ) -> Self {
         Self {
             sender,
-            intervall_secs,
+            git_intervall_secs,
+            gh_intervall_secs,
+        }
+    }
+
+    async fn key_thread(sender: mpsc::UnboundedSender<Event>) {
+        let mut reader = crossterm::event::EventStream::new();
+        loop {
+            let crossterm_event = reader.next().fuse();
+            if let Some(Ok(evt)) = crossterm_event.await {
+                let _ = sender.send(Event::Crossterm(evt));
+            }
+        }
+    }
+
+    async fn animation_tick_thread(sender: mpsc::UnboundedSender<Event>) {
+        let animation_tick_rate = Duration::from_secs_f64(0.7);
+        let mut animation_tick = tokio::time::interval(animation_tick_rate);
+        loop {
+            let animation_tick_delay = animation_tick.tick();
+            let _ = animation_tick_delay.await;
+            let _ = sender.send(Event::AnimationTick);
+        }
+    }
+
+    async fn tick_thread(sender: mpsc::UnboundedSender<Event>, intervall_secs: u32) {
+        let tick_rate = Duration::from_secs_f64(intervall_secs as f64);
+        let mut tick = tokio::time::interval(tick_rate);
+        loop {
+            let tick_delay = tick.tick();
+            let _ = tick_delay.await;
+            let _ = sender.send(Event::Tick);
         }
     }
 
@@ -105,41 +141,43 @@ impl EventTask {
     ///
     /// This function emits tick events at a fixed rate and polls for crossterm events in between.
     async fn run(self) -> color_eyre::Result<()> {
-        let mut reader = crossterm::event::EventStream::new();
+        let keyevent_sender = self.sender.clone();
+        let keyevent_task =
+            tokio::spawn(async move { EventTask::key_thread(keyevent_sender).await });
 
-        let tick_rate = Duration::from_secs_f64(self.intervall_secs as f64);
-        let animation_tick_rate = Duration::from_secs_f64(0.7);
+        let animation_sender = self.sender.clone();
+        let animation_task =
+            tokio::spawn(async move { EventTask::animation_tick_thread(animation_sender).await });
 
-        let mut tick = tokio::time::interval(tick_rate);
-        let mut animation_tick = tokio::time::interval(animation_tick_rate);
+        let git_tick_task = match self.git_intervall_secs {
+            Some(secs) => {
+                let tick_sender = self.sender.clone();
+                let t =
+                    tokio::spawn(async move { EventTask::tick_thread(tick_sender, secs).await });
+                Some(t)
+            }
+            None => None,
+        };
 
-        loop {
-            let crossterm_event = reader.next().fuse();
-            let tick_delay = tick.tick();
-            let animation_tick_delay = animation_tick.tick();
+        let gh_tick_task = match self.gh_intervall_secs {
+            Some(secs) => {
+                let tick_sender = self.sender.clone();
+                let t =
+                    tokio::spawn(async move { EventTask::tick_thread(tick_sender, secs).await });
+                Some(t)
+            }
+            None => None,
+        };
 
-            tokio::select! {
-              _ = self.sender.closed() => {
-                break;
-              }
-              _ = tick_delay => {
-                self.send(Event::Tick);
-              }
-              _ = animation_tick_delay => {
-                self.send(Event::AnimationTick);
-              }
-              Some(Ok(evt)) = crossterm_event => {
-                self.send(Event::Crossterm(evt));
-              }
-            };
-        }
+        keyevent_task.await?;
+        animation_task.await?;
+        if let Some(t) = git_tick_task {
+            t.await?
+        };
+        if let Some(t) = gh_tick_task {
+            t.await?
+        };
+
         Ok(())
-    }
-
-    /// Sends an event to the receiver.
-    fn send(&self, event: Event) {
-        // Ignores the result because shutting down the app drops the receiver, which causes the send
-        // operation to fail. This is expected behavior and should not panic.
-        let _ = self.sender.send(event);
     }
 }
