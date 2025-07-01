@@ -6,17 +6,17 @@ They can live in a local or a GitHub repository.
 ## Usage
 
 ```shell
-ferriby -gh <owner>/<repository>
+ferriby -gh owner/repository
 ```
 
 ```shell
-ferriby -g <path_to_local_repository>
+ferriby -g path_to_local_repository
 ```
 
 You can use ferriby with multiple repositories at once
 
 ```shell
-ferriby -g <path_to_local_repo1> -gh <owner>/<repo1> -gh <owner2>/<repo2> -g <path_to_local_repo2>
+ferriby -g local_path -gh owner/repo -g other_path -gh ...
 ```
 
 ## Configuration
@@ -27,7 +27,7 @@ Create your PAT in the [settings section](https://github.com/settings/personal-a
 Test it with
 
 ```shell
-FERRIBY_GH_PAT="xyz" ferriby owner repository
+FERRIBY_GH_PAT="xyz" ferriby -gh owner/repository
 ```
 
 ## Advisory
