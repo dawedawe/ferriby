@@ -2,7 +2,7 @@ use color_eyre::eyre::OptionExt;
 use futures::{FutureExt, StreamExt};
 use ratatui::crossterm::event::Event as CrosstermEvent;
 use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, task::JoinSet};
 
 /// Representation of all possible events.
 #[derive(Clone, Debug)]
@@ -121,9 +121,9 @@ impl EventTask {
         let animation_tick_rate = Duration::from_secs_f64(0.7);
         let mut animation_tick = tokio::time::interval(animation_tick_rate);
         loop {
+            let _ = sender.send(Event::AnimationTick);
             let animation_tick_delay = animation_tick.tick();
             let _ = animation_tick_delay.await;
-            let _ = sender.send(Event::AnimationTick);
         }
     }
 
@@ -131,9 +131,9 @@ impl EventTask {
         let tick_rate = Duration::from_secs_f64(intervall_secs as f64);
         let mut tick = tokio::time::interval(tick_rate);
         loop {
+            let _ = sender.send(Event::Tick);
             let tick_delay = tick.tick();
             let _ = tick_delay.await;
-            let _ = sender.send(Event::Tick);
         }
     }
 
@@ -141,43 +141,24 @@ impl EventTask {
     ///
     /// This function emits tick events at a fixed rate and polls for crossterm events in between.
     async fn run(self) -> color_eyre::Result<()> {
+        let mut set = JoinSet::new();
         let keyevent_sender = self.sender.clone();
-        let keyevent_task =
-            tokio::spawn(async move { EventTask::key_thread(keyevent_sender).await });
+        set.spawn(async move { EventTask::key_thread(keyevent_sender).await });
 
         let animation_sender = self.sender.clone();
-        let animation_task =
-            tokio::spawn(async move { EventTask::animation_tick_thread(animation_sender).await });
+        set.spawn(async move { EventTask::animation_tick_thread(animation_sender).await });
 
-        let git_tick_task = match self.git_intervall_secs {
-            Some(secs) => {
-                let tick_sender = self.sender.clone();
-                let t =
-                    tokio::spawn(async move { EventTask::tick_thread(tick_sender, secs).await });
-                Some(t)
-            }
-            None => None,
+        if let Some(secs) = self.git_intervall_secs {
+            let tick_sender = self.sender.clone();
+            set.spawn(async move { EventTask::tick_thread(tick_sender, secs).await });
         };
 
-        let gh_tick_task = match self.gh_intervall_secs {
-            Some(secs) => {
-                let tick_sender = self.sender.clone();
-                let t =
-                    tokio::spawn(async move { EventTask::tick_thread(tick_sender, secs).await });
-                Some(t)
-            }
-            None => None,
+        if let Some(secs) = self.gh_intervall_secs {
+            let tick_sender = self.sender.clone();
+            set.spawn(async move { EventTask::tick_thread(tick_sender, secs).await });
         };
 
-        keyevent_task.await?;
-        animation_task.await?;
-        if let Some(t) = git_tick_task {
-            t.await?
-        };
-        if let Some(t) = gh_tick_task {
-            t.await?
-        };
-
+        let _ = set.join_all().await;
         Ok(())
     }
 }
