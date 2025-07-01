@@ -66,10 +66,7 @@ fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
 }
 
 fn usage(name: String) -> ! {
-    eprintln!(
-        "Usage: {} [-gh <owner>/<repository> | -g <path_to_repo>]",
-        name
-    );
+    eprintln!("Usage: {} [-gh owner/repository] [-g path_to_repo]", name);
     std::process::exit(1);
 }
 
