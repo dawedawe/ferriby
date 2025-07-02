@@ -1,9 +1,12 @@
 use crate::app::{App, Source};
-use ferriby_sources::{git::GitSource, github::GitHubSource};
+use git::GitSource;
+use github::GitHubSource;
 use std::env;
 
 pub mod app;
 pub mod event;
+pub mod git;
+pub mod github;
 pub mod ui;
 
 #[tokio::main]

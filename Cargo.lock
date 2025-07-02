@@ -327,20 +327,10 @@ dependencies = [
  "chrono",
  "color-eyre",
  "crossterm",
- "ferriby-sources",
- "futures",
- "ratatui",
- "tokio",
-]
-
-[[package]]
-name = "ferriby-sources"
-version = "0.1.0"
-dependencies = [
- "chrono",
  "futures",
  "git2",
  "http",
+ "ratatui",
  "regex",
  "reqwest",
  "tokio",

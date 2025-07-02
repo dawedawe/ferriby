@@ -1,5 +1,5 @@
 [workspace]
-members = ["ferriby", "ferriby-sources"]
+members = ["ferriby"]
 resolver = "2"
 
 
