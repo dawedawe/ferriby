@@ -52,11 +52,19 @@ pub async fn get_last_event(source: GitHubSource) -> Option<DateTime<Utc>> {
     }
 
     let client = reqwest::Client::new();
-    let response = client.execute(request).await.expect("http request failed");
-    let bytes = response.bytes().await.expect("bytes() failed");
-    let body_str = std::str::from_utf8(&bytes).expect("from_utf8() failed");
-    let timestamps = parse_timestamps(body_str.to_string());
-    timestamps.into_iter().max()
+    match client
+        .execute(request)
+        .await
+        .and_then(|r| r.error_for_status())
+    {
+        Ok(response) => {
+            let bytes = response.bytes().await.expect("bytes() failed");
+            let body_str = std::str::from_utf8(&bytes).expect("from_utf8() failed");
+            let timestamps = parse_timestamps(body_str.to_string());
+            timestamps.into_iter().max()
+        }
+        Err(_) => None,
+    }
 }
 
 fn parse_timestamps(response: String) -> Vec<DateTime<Utc>> {
