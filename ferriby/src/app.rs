@@ -1,11 +1,11 @@
 use std::fmt::Display;
 
-use crate::event::{AppEvent, Event, EventHandler};
-use chrono::{DateTime, Utc};
-use ferriby_sources::{
+use crate::{
+    event::{AppEvent, Event, EventHandler},
     git::{self, GitSource},
     github::{self, GitHubSource},
 };
+use chrono::{DateTime, Utc};
 use ratatui::{
     DefaultTerminal,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
@@ -211,7 +211,7 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ferriby_sources::github::GitHubSource;
+    use github::GitHubSource;
 
     #[test]
     fn github_display() {
