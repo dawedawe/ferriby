@@ -7,13 +7,11 @@ use tokio::{sync::mpsc, task::JoinSet};
 /// Representation of all possible events.
 #[derive(Clone, Debug)]
 pub enum Event {
-    /// An event that is emitted on a regular schedule.
-    ///
-    /// Use this event to run any code which has to run outside of being a direct response to a user
-    /// event. e.g. polling exernal systems, updating animations, or rendering the UI based on a
-    /// fixed frame rate.
-    Tick,
-    /// Event emitted when it's time to animate ferris
+    /// An event that is emitted when it's time to check git.
+    GitTick,
+    /// An event that is emitted when it's time to check GitHub.
+    GitHubTick,
+    /// Event emitted when it's time to animate ferris.
     AnimationTick,
     /// Crossterm events.
     ///
@@ -45,7 +43,7 @@ pub struct EventHandler {
 
 impl EventHandler {
     /// Constructs a new instance of [`EventHandler`] and spawns a new thread to handle events.
-    pub fn new(git_intervall_secs: Option<u32>, gh_intervall_secs: Option<u32>) -> Self {
+    pub fn new(git_intervall_secs: Option<f32>, gh_intervall_secs: Option<f32>) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
         let actor = EventTask::new(sender.clone(), git_intervall_secs, gh_intervall_secs);
         tokio::spawn(async { actor.run().await });
@@ -89,16 +87,16 @@ impl Default for EventHandler {
 struct EventTask {
     /// Event sender channel.
     sender: mpsc::UnboundedSender<Event>,
-    git_intervall_secs: Option<u32>,
-    gh_intervall_secs: Option<u32>,
+    git_intervall_secs: Option<f32>,
+    gh_intervall_secs: Option<f32>,
 }
 
 impl EventTask {
     /// Constructs a new instance of [`EventThread`].
     fn new(
         sender: mpsc::UnboundedSender<Event>,
-        git_intervall_secs: Option<u32>,
-        gh_intervall_secs: Option<u32>,
+        git_intervall_secs: Option<f32>,
+        gh_intervall_secs: Option<f32>,
     ) -> Self {
         Self {
             sender,
@@ -117,21 +115,11 @@ impl EventTask {
         }
     }
 
-    async fn animation_tick_thread(sender: mpsc::UnboundedSender<Event>) {
-        let animation_tick_rate = Duration::from_secs_f64(0.7);
-        let mut animation_tick = tokio::time::interval(animation_tick_rate);
-        loop {
-            let _ = sender.send(Event::AnimationTick);
-            let animation_tick_delay = animation_tick.tick();
-            let _ = animation_tick_delay.await;
-        }
-    }
-
-    async fn tick_thread(sender: mpsc::UnboundedSender<Event>, intervall_secs: u32) {
-        let tick_rate = Duration::from_secs_f64(intervall_secs as f64);
+    async fn tick_thread(sender: mpsc::UnboundedSender<Event>, event: Event, intervall_secs: f32) {
+        let tick_rate = Duration::from_secs_f32(intervall_secs);
         let mut tick = tokio::time::interval(tick_rate);
         loop {
-            let _ = sender.send(Event::Tick);
+            let _ = sender.send(event.clone());
             let tick_delay = tick.tick();
             let _ = tick_delay.await;
         }
@@ -146,16 +134,22 @@ impl EventTask {
         set.spawn(async move { EventTask::key_thread(keyevent_sender).await });
 
         let animation_sender = self.sender.clone();
-        set.spawn(async move { EventTask::animation_tick_thread(animation_sender).await });
+        set.spawn(async move {
+            EventTask::tick_thread(animation_sender, Event::AnimationTick, 0.7).await
+        });
 
         if let Some(secs) = self.git_intervall_secs {
             let tick_sender = self.sender.clone();
-            set.spawn(async move { EventTask::tick_thread(tick_sender, secs).await });
+            set.spawn(
+                async move { EventTask::tick_thread(tick_sender, Event::GitTick, secs).await },
+            );
         };
 
         if let Some(secs) = self.gh_intervall_secs {
             let tick_sender = self.sender.clone();
-            set.spawn(async move { EventTask::tick_thread(tick_sender, secs).await });
+            set.spawn(
+                async move { EventTask::tick_thread(tick_sender, Event::GitHubTick, secs).await },
+            );
         };
 
         let _ = set.join_all().await;
