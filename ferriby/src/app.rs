@@ -100,7 +100,7 @@ impl App {
         let git_intervall_secs = sources
             .iter()
             .find(|source| matches!(source, Source::Git(_)))
-            .map(|_| 5);
+            .map(|_| 3.0);
 
         let gh_intervall_secs = {
             let gh_source = sources.iter().find_map(|source| match source {
@@ -108,8 +108,8 @@ impl App {
                 _ => None,
             });
             match gh_source {
-                Some(gh_source) if gh_source.pat.is_some() => Some(5),
-                Some(_) => Some(60),
+                Some(gh_source) if gh_source.pat.is_some() => Some(5.0),
+                Some(_) => Some(60.0),
                 _ => None,
             }
         };
@@ -129,7 +129,8 @@ impl App {
         while self.running {
             terminal.draw(|frame| frame.render_widget(&self, frame.area()))?;
             match self.events.next().await? {
-                Event::Tick => self.tick().await,
+                Event::GitTick => self.git_tick().await,
+                Event::GitHubTick => self.github_tick().await,
                 Event::AnimationTick => self.animation_tick(),
                 Event::Crossterm(event) => {
                     if let crossterm::event::Event::Key(key_event) = event {
@@ -171,17 +172,29 @@ impl App {
     }
 
     /// Handles the tick event of the terminal.
-    async fn tick(&mut self) {
-        let last_event = match &self.sources[self.selected] {
-            Source::GitHub(source) => tokio::spawn(github::get_last_event(source.clone())).await,
-            Source::Git(source) => tokio::spawn(git::get_last_event(source.clone())).await,
-        };
-        match last_event {
-            Ok(last_event) => {
-                self.happiness = Happiness::from_last_activity(last_event);
+    async fn git_tick(&mut self) {
+        if let Source::Git(source) = &self.sources[self.selected] {
+            let last_event = tokio::spawn(git::get_last_event(source.clone())).await;
+            match last_event {
+                Ok(last_event) => {
+                    self.happiness = Happiness::from_last_activity(last_event);
+                }
+                Err(_) => self.running = false,
             }
-            Err(_) => self.running = false,
-        }
+        };
+    }
+
+    /// Handles the github_tick event of the terminal.
+    async fn github_tick(&mut self) {
+        if let Source::GitHub(source) = &self.sources[self.selected] {
+            let last_event = tokio::spawn(github::get_last_event(source.clone())).await;
+            match last_event {
+                Ok(last_event) => {
+                    self.happiness = Happiness::from_last_activity(last_event);
+                }
+                Err(_) => self.running = false,
+            }
+        };
     }
 
     /// Handles the animation_tick event of the terminal.
