@@ -3,6 +3,8 @@
 Keep Ferrises alive and happy by feeding them commits in your repositories.  
 They can live in a local or a GitHub repository.
 
+![Ferriby demo recording](./vhs/ferriby.gif)
+
 ## Usage
 
 ```shell
