@@ -22,7 +22,7 @@ async fn main() -> color_eyre::Result<()> {
         }
         Err(e) => {
             eprintln!("{e}");
-            usage(args[0].clone());
+            usage();
         }
     }
 }
@@ -68,8 +68,8 @@ fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
     Ok(sources)
 }
 
-fn usage(name: String) -> ! {
-    eprintln!("Usage: {} [-gh owner/repository] [-g path_to_repo]", name);
+fn usage() -> ! {
+    eprintln!("Usage: ferriby [-gh owner/repository] [-g path_to_repo]");
     std::process::exit(1);
 }
 

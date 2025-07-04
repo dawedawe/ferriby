@@ -124,27 +124,43 @@ impl App {
         let mut list_state = ListState::default().with_selected(Some(self.selected));
         StatefulWidget::render(list, area, buf, &mut list_state);
     }
-    fn render_ferris(&self, area: Rect, buf: &mut Buffer) {
-        let block = Block::bordered()
-            .title(" Ferriby ")
-            .title_alignment(Alignment::Center)
-            .border_type(BorderType::Rounded);
-
+    fn render_main(&self, area: Rect, buf: &mut Buffer) {
         let happiness: String = self.happiness.into();
         let ferris = ferris(self.happiness, self.animation);
         let text = format!(
-            "Press `Esc`, `Ctrl-C` or `q` to stop running.\n\
-             Source: {}\n\
+            "Source: {}\n\
              Happiness level: {}\n\
              {}",
             self.sources[self.selected], happiness, ferris
         );
 
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Max(1),
+                Constraint::Min(3),
+                Constraint::Max(1),
+                Constraint::Max(1),
+            ])
+            .split(area);
+        let top_area = chunks[1];
+        let help_area = chunks[2];
+
+        Block::bordered()
+            .title(" Ferriby ")
+            .style(App::get_style())
+            .title_alignment(Alignment::Center)
+            .border_type(BorderType::Rounded)
+            .render(area, buf);
+
         Paragraph::new(text)
-            .block(block)
             .style(App::get_style())
             .centered()
-            .render(area, buf);
+            .render(top_area, buf);
+        Paragraph::new("Exit: q, Previous/Next Source: ↑/↓")
+            .style(App::get_style())
+            .centered()
+            .render(help_area, buf);
     }
 }
 
@@ -157,6 +173,6 @@ impl Widget for &App {
             .split(area);
 
         self.render_list(chunks[0], buf);
-        self.render_ferris(chunks[1], buf);
+        self.render_main(chunks[1], buf);
     }
 }
