@@ -23,7 +23,7 @@ ferriby -g local_path -gh owner/repo -g other_path -gh ...
 
 ## Configuration
 
-To access private GitHub repos or to have a higher rate limit for the checks,
+To access private GitHub repos and to have a higher rate limit for the checks,
 you can pass a PAT (Personal Access Token) to ferriby via the environment variable `FERRIBY_GH_PAT`.  
 Create your PAT in the [settings section](https://github.com/settings/personal-access-tokens) with `Repository permissions` of `Read`.
 Test it with
@@ -31,6 +31,8 @@ Test it with
 ```shell
 FERRIBY_GH_PAT="xyz" ferriby -gh owner/repository
 ```
+
+It is strongly recommended to do this. Otherwise you are rate limited to 60 checks per hour.
 
 ## Advisory
 
