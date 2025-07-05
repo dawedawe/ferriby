@@ -56,14 +56,14 @@ fn configured_sources(path: &str) -> Result<Vec<Source>, String> {
     let settings = Config::builder()
         .add_source(File::with_name(path))
         .build()
-        .map_err(|_| format!("failed to parse config file {path}").to_string())?;
+        .map_err(|_| format!("failed to parse config file {path}"))?;
     let mut sources = vec![];
 
     let git_config = settings.get_array("git");
     if let Ok(paths) = git_config {
         paths.iter().for_each(|path| {
             let source = Source::Git(GitSource {
-                path: path.to_string(),
+                path: path.clone().into_string().expect("expected a string"),
             });
             sources.push(source);
         })
@@ -76,7 +76,7 @@ fn configured_sources(path: &str) -> Result<Vec<Source>, String> {
             _ => None,
         };
         repos.iter().for_each(|repo| {
-            let repo = repo.to_string();
+            let repo = repo.clone().into_string().expect("expected a string");
             let gh_args: Vec<&str> = repo.split("/").collect();
             if gh_args.len() < 2 {
                 panic!("invalid GitHub argument format, expected 'owner/repo'.");
