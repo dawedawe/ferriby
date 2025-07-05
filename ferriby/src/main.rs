@@ -34,20 +34,27 @@ const GH_PAT_ENV_NAME: &str = "FERRIBY_GH_PAT";
 
 fn config_path() -> String {
     env::home_dir()
-        .map(|h| {
-            format!(
-                "{}/.config/ferriby/config.json",
-                h.into_os_string()
-                    .into_string()
-                    .expect("failed to convert OsString to String")
-            )
+        .map(|mut h| {
+            if std::env::consts::OS == "windows" {
+                h.push("AppData");
+                h.push("Roaming");
+                h.push("ferriby");
+                h.push("config.json");
+            } else {
+                h.push(".config");
+                h.push("ferriby");
+                h.push("config.json");
+            };
+            h.to_str()
+                .expect("failed to convert PathBuf to &str")
+                .to_string()
         })
         .expect("failed to determine config path")
 }
 
-fn configured_sources(path: String) -> Result<Vec<Source>, String> {
+fn configured_sources(path: &str) -> Result<Vec<Source>, String> {
     let settings = Config::builder()
-        .add_source(File::with_name(path.as_str()))
+        .add_source(File::with_name(path))
         .build()
         .map_err(|_| format!("failed to parse config file {path}").to_string())?;
     let mut sources = vec![];
@@ -94,9 +101,10 @@ fn configured_sources(path: String) -> Result<Vec<Source>, String> {
 fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
     if args.len() <= 1 {
         let path = config_path();
-        configured_sources(path)
+        configured_sources(path.as_str())
     } else if args.len() == 3 && args[1] == "-c" {
-        configured_sources(args[2].clone())
+        let path = args[2].as_str();
+        configured_sources(path)
     } else {
         let chunks = args[1..].chunks(2);
         let mut sources = vec![];
