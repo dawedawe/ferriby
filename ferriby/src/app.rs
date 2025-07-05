@@ -6,6 +6,7 @@ use crate::{
     github::{self, GitHubSource},
 };
 use chrono::{DateTime, Utc};
+use crossterm::event::KeyEventKind;
 use ratatui::{
     DefaultTerminal,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
@@ -152,11 +153,11 @@ impl App {
             KeyCode::Char('c' | 'C') if key_event.modifiers == KeyModifiers::CONTROL => {
                 self.events.send(AppEvent::Quit)
             }
-            KeyCode::Down => {
+            KeyCode::Down if key_event.kind == KeyEventKind::Press => {
                 self.happiness = Happiness::Undecided;
                 self.selected = (self.selected + 1) % self.sources.len();
             }
-            KeyCode::Up => {
+            KeyCode::Up if key_event.kind == KeyEventKind::Press => {
                 self.happiness = Happiness::Undecided;
                 self.selected = {
                     if self.selected == 0 {
