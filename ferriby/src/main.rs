@@ -152,6 +152,8 @@ fn usage() -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn parse_args_returns_err_for_mutual_exclusive_args() {
@@ -220,6 +222,66 @@ mod tests {
         {
             assert_eq!(owner, "owner2");
             assert_eq!(repo, "repo3");
+        }
+    }
+
+    #[test]
+    fn empty_config_file_should_err() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path().to_str().unwrap();
+        let sources = configured_sources(path);
+        assert!(sources.is_err());
+    }
+
+    #[test]
+    fn config_file_with_empty_json_should_err() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "{{}}").unwrap();
+        temp_file.flush().unwrap();
+        let path = temp_file.path().to_str().unwrap();
+        let sources = configured_sources(path);
+        assert!(sources.is_err());
+    }
+
+    #[test]
+    fn config_file_with_just_empty_arrays_should_err() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "{{ \"git\": [], \"github\": [] }}").unwrap();
+        temp_file.flush().unwrap();
+        let path = temp_file.path().to_str().unwrap();
+        let sources = configured_sources(path);
+        assert!(sources.is_err());
+    }
+
+    #[test]
+    fn config_file_sources_are_parsed_correctly() {
+        let mut temp_file = tempfile::Builder::new()
+            .suffix(".json")
+            .tempfile()
+            .expect("NamedTempFile::new() failed");
+        let config = "{ \
+                \"git\": [ \
+                    \"foo/bar/baz\", \
+                    \"mi/mu/meh\" \
+                ], \
+                \"github\": [ \
+                    \"owner/repo1\", \
+                    \"owner/repo2\", \
+                    \"owner/repo3\" \
+                ] \
+            }";
+        temp_file
+            .write_all(config.as_bytes())
+            .expect("write_all failed");
+        temp_file.flush().expect("flush failed");
+
+        let path = temp_file.path().to_str().unwrap();
+        let sources = configured_sources(path);
+        match sources {
+            Ok(sources) => {
+                assert_eq!(sources.len(), 5);
+            }
+            Err(_) => assert!(sources.is_ok()),
         }
     }
 }
