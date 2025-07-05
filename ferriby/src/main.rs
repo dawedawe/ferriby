@@ -15,11 +15,7 @@ async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let args: Vec<String> = env::args().collect();
 
-    let sources = if args.len() <= 1 {
-        configured_sources()
-    } else {
-        parse_args(&args)
-    };
+    let sources = parse_args(&args);
     match sources {
         Ok(sources) => {
             let terminal = ratatui::init();
@@ -36,8 +32,8 @@ async fn main() -> color_eyre::Result<()> {
 
 const GH_PAT_ENV_NAME: &str = "FERRIBY_GH_PAT";
 
-fn configured_sources() -> Result<Vec<Source>, String> {
-    let path = std::env::home_dir()
+fn config_path() -> String {
+    env::home_dir()
         .map(|h| {
             format!(
                 "{}/.config/ferriby/config.json",
@@ -46,11 +42,14 @@ fn configured_sources() -> Result<Vec<Source>, String> {
                     .expect("failed to convert OsString to String")
             )
         })
-        .expect("failed to determine config path");
+        .expect("failed to determine config path")
+}
+
+fn configured_sources(path: String) -> Result<Vec<Source>, String> {
     let settings = Config::builder()
         .add_source(File::with_name(path.as_str()))
         .build()
-        .map_err(|_| "failed to parse config file".to_string())?;
+        .map_err(|_| format!("failed to parse config file {path}").to_string())?;
     let mut sources = vec![];
 
     let git_config = settings.get_array("git");
@@ -73,7 +72,7 @@ fn configured_sources() -> Result<Vec<Source>, String> {
             let repo = repo.to_string();
             let gh_args: Vec<&str> = repo.split("/").collect();
             if gh_args.len() < 2 {
-                panic!("Invalid GitHub argument format. Expected 'owner/repo'.");
+                panic!("invalid GitHub argument format, expected 'owner/repo'.");
             }
 
             let s = Source::GitHub(GitHubSource {
@@ -93,48 +92,52 @@ fn configured_sources() -> Result<Vec<Source>, String> {
 }
 
 fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
-    if args.len() < 3 {
-        return Err("arguments missing".into());
-    }
+    if args.len() <= 1 {
+        let path = config_path();
+        configured_sources(path)
+    } else if args.len() == 3 && args[1] == "-c" {
+        configured_sources(args[2].clone())
+    } else {
+        let chunks = args[1..].chunks(2);
+        let mut sources = vec![];
+        for chunk in chunks {
+            if chunk.len() != 2 {
+                return Err("argument missing".into());
+            }
 
-    let chunks = args[1..].chunks(2);
-    let mut sources = vec![];
-    for chunk in chunks {
-        if chunk.len() != 2 {
-            return Err("argument missing".into());
+            if chunk[0] == "-gh" {
+                let pat = match std::env::var(GH_PAT_ENV_NAME) {
+                    Ok(token) if !token.is_empty() => Some(token),
+                    _ => None,
+                };
+                let gh_arg: Vec<&str> = chunk[1].split("/").collect();
+                if gh_arg.len() < 2 {
+                    return Err("Invalid GitHub argument format. Expected 'owner/repo'.".into());
+                }
+                let github_source = GitHubSource {
+                    owner: gh_arg[0].to_string(),
+                    repo: gh_arg[1].to_string(),
+                    pat,
+                };
+                sources.push(Source::GitHub(github_source));
+            } else if chunk[0] == "-g" {
+                let git_source = GitSource {
+                    path: chunk[1].clone(),
+                };
+                sources.push(Source::Git(git_source));
+            } else if chunk[0] == "-c" {
+                return Err("-c arg can't be combined with other args".into());
+            } else {
+                return Err("unknown argument".into());
+            };
         }
 
-        let source = if chunk[0] == "-gh" {
-            let pat = match std::env::var(GH_PAT_ENV_NAME) {
-                Ok(token) if !token.is_empty() => Some(token),
-                _ => None,
-            };
-            let gh_arg: Vec<&str> = chunk[1].split("/").collect();
-            if gh_arg.len() < 2 {
-                return Err("Invalid GitHub argument format. Expected 'owner/repo'.".into());
-            }
-            let github_source = GitHubSource {
-                owner: gh_arg[0].to_string(),
-                repo: gh_arg[1].to_string(),
-                pat,
-            };
-            Source::GitHub(github_source)
-        } else if chunk[0] == "-g" {
-            let git_source = GitSource {
-                path: chunk[1].clone(),
-            };
-            Source::Git(git_source)
-        } else {
-            return Err("unknown argument".into());
-        };
-        sources.push(source);
+        Ok(sources)
     }
-
-    Ok(sources)
 }
 
 fn usage() -> ! {
-    eprintln!("Usage: ferriby [-gh owner/repository] [-g path_to_repo]");
+    eprintln!("Usage: ferriby [-c config_file] | [-gh owner/repository] [-g path_to_repo]");
     std::process::exit(1);
 }
 
@@ -143,9 +146,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_args_returns_err_for_empty_args() {
-        let args = vec!["ferriby".into()];
+    fn parse_args_returns_err_for_mutual_exclusive_args() {
+        let args = vec![
+            "ferriby".into(),
+            "-gh".into(),
+            "owner1/repo1".into(),
+            "-f".into(),
+            "foo/config.json".into(),
+        ];
         let sources = parse_args(&args);
+
         assert!(sources.is_err());
     }
 

@@ -21,6 +21,10 @@ You can use ferriby with multiple repositories at once
 ferriby -g local_path -gh owner/repo -g other_path -gh ...
 ```
 
+```shell
+ferriby -c config_file.json
+```
+
 ## Configuration
 
 To access private GitHub repos and to have a higher rate limit for the checks,
@@ -33,6 +37,25 @@ FERRIBY_GH_PAT="xyz" ferriby -gh owner/repository
 ```
 
 It is strongly recommended to do this. Otherwise you are rate limited to 60 checks per hour.
+
+
+ferriby looks for a config file in `$HOME/.config/ferriby/config.json`. You can override that path with the `-c` argument.
+The config file should look like this:
+
+```json
+{
+  "git": [
+    "/home/dawe/src/ferriby",
+    "/home/dawe/src/tusistor"
+  ],
+  "github": [
+    "dawedawe/ratatui",
+    "dawedawe/ratzilla"
+  ]
+}
+```
+
+At least one repository needs to be configured.
 
 ## Advisory
 
