@@ -1,4 +1,5 @@
 use crate::app::{App, Source};
+use config::{Config, File};
 use git::GitSource;
 use github::GitHubSource;
 use std::env;
@@ -13,7 +14,13 @@ pub mod ui;
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let args: Vec<String> = env::args().collect();
-    match parse_args(&args) {
+
+    let sources = if args.len() <= 1 {
+        configured_sources()
+    } else {
+        parse_args(&args)
+    };
+    match sources {
         Ok(sources) => {
             let terminal = ratatui::init();
             let result = App::new(sources).run(terminal).await;
@@ -24,6 +31,64 @@ async fn main() -> color_eyre::Result<()> {
             eprintln!("{e}");
             usage();
         }
+    }
+}
+
+const GH_PAT_ENV_NAME: &str = "FERRIBY_GH_PAT";
+
+fn configured_sources() -> Result<Vec<Source>, String> {
+    let path = std::env::home_dir()
+        .map(|h| {
+            format!(
+                "{}/.config/ferriby/config.json",
+                h.into_os_string()
+                    .into_string()
+                    .expect("failed to convert OsString to String")
+            )
+        })
+        .expect("failed to determine config path");
+    let settings = Config::builder()
+        .add_source(File::with_name(path.as_str()))
+        .build()
+        .map_err(|_| "failed to parse config file".to_string())?;
+    let mut sources = vec![];
+
+    let git_config = settings.get_array("git");
+    if let Ok(paths) = git_config {
+        paths.iter().for_each(|path| {
+            let source = Source::Git(GitSource {
+                path: path.to_string(),
+            });
+            sources.push(source);
+        })
+    };
+
+    let gh_config = settings.get_array("github");
+    if let Ok(repos) = gh_config {
+        let pat = match std::env::var(GH_PAT_ENV_NAME) {
+            Ok(token) if !token.is_empty() => Some(token),
+            _ => None,
+        };
+        repos.iter().for_each(|repo| {
+            let repo = repo.to_string();
+            let gh_args: Vec<&str> = repo.split("/").collect();
+            if gh_args.len() < 2 {
+                panic!("Invalid GitHub argument format. Expected 'owner/repo'.");
+            }
+
+            let s = Source::GitHub(GitHubSource {
+                owner: gh_args[0].to_string(),
+                repo: gh_args[1].to_string(),
+                pat: pat.clone(),
+            });
+            sources.push(s);
+        })
+    };
+
+    if sources.is_empty() {
+        Err("no sources defined in config file".into())
+    } else {
+        Ok(sources)
     }
 }
 
@@ -40,7 +105,7 @@ fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
         }
 
         let source = if chunk[0] == "-gh" {
-            let pat = match std::env::var("FERRIBY_GH_PAT") {
+            let pat = match std::env::var(GH_PAT_ENV_NAME) {
                 Ok(token) if !token.is_empty() => Some(token),
                 _ => None,
             };
