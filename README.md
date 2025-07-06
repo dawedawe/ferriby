@@ -15,11 +15,13 @@ ferriby -gh owner/repository
 ferriby -g path_to_local_repository
 ```
 
-You can use ferriby with multiple repositories at once
+You can use ferriby with multiple repositories at once:
 
 ```shell
 ferriby -g local_path -gh owner/repo -g other_path -gh ...
 ```
+
+Use a custom config file path:
 
 ```shell
 ferriby -c config_file.json
@@ -55,7 +57,7 @@ The config file should look like this:
 }
 ```
 
-At least one repository needs to be configured.
+At least one repository needs to be configured. The json needs to be clean, no trailing commas allowed.
 
 ## Advisory
 
