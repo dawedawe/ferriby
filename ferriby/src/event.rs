@@ -2,7 +2,10 @@ use color_eyre::eyre::OptionExt;
 use futures::{FutureExt, StreamExt};
 use ratatui::crossterm::event::Event as CrosstermEvent;
 use std::time::Duration;
-use tokio::{sync::mpsc, task::JoinSet};
+use tokio::{
+    sync::mpsc,
+    task::{JoinHandle, JoinSet},
+};
 
 /// Representation of all possible events.
 #[derive(Clone, Debug)]
@@ -35,19 +38,31 @@ pub enum AppEvent {
 /// Terminal event handler.
 #[derive(Debug)]
 pub struct EventHandler {
+    /// The interval for git checks.
+    git_interval_secs: Option<f32>,
+    /// The interval for GitHub checks.
+    github_interval_secs: Option<f32>,
     /// Event sender channel.
     sender: mpsc::UnboundedSender<Event>,
     /// Event receiver channel.
     receiver: mpsc::UnboundedReceiver<Event>,
+    /// The EventTask task
+    actor_task: JoinHandle<Result<(), color_eyre::eyre::Error>>,
 }
 
 impl EventHandler {
     /// Constructs a new instance of [`EventHandler`] and spawns a new thread to handle events.
-    pub fn new(git_intervall_secs: Option<f32>, gh_intervall_secs: Option<f32>) -> Self {
+    pub fn new(git_interval_secs: Option<f32>, github_interval_secs: Option<f32>) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        let actor = EventTask::new(sender.clone(), git_intervall_secs, gh_intervall_secs);
-        tokio::spawn(async { actor.run().await });
-        Self { sender, receiver }
+        let actor = EventTask::new(sender.clone(), git_interval_secs, github_interval_secs);
+        let actor_task = tokio::spawn(async { actor.run().await });
+        Self {
+            git_interval_secs,
+            github_interval_secs,
+            sender,
+            receiver,
+            actor_task,
+        }
     }
 
     /// Receives an event from the sender.
@@ -75,6 +90,17 @@ impl EventHandler {
         // reference to it
         let _ = self.sender.send(Event::App(app_event));
     }
+
+    /// Restart the EventTask actor to have fast updates after a change of the selected source
+    pub fn restart(&mut self) {
+        self.actor_task.abort();
+        let actor = EventTask::new(
+            self.sender.clone(),
+            self.git_interval_secs,
+            self.github_interval_secs,
+        );
+        self.actor_task = tokio::spawn(async { actor.run().await });
+    }
 }
 
 impl Default for EventHandler {
@@ -87,21 +113,21 @@ impl Default for EventHandler {
 struct EventTask {
     /// Event sender channel.
     sender: mpsc::UnboundedSender<Event>,
-    git_intervall_secs: Option<f32>,
-    gh_intervall_secs: Option<f32>,
+    git_interval_secs: Option<f32>,
+    gh_interval_secs: Option<f32>,
 }
 
 impl EventTask {
     /// Constructs a new instance of [`EventThread`].
     fn new(
         sender: mpsc::UnboundedSender<Event>,
-        git_intervall_secs: Option<f32>,
-        gh_intervall_secs: Option<f32>,
+        git_interval_secs: Option<f32>,
+        gh_interval_secs: Option<f32>,
     ) -> Self {
         Self {
             sender,
-            git_intervall_secs,
-            gh_intervall_secs,
+            git_interval_secs,
+            gh_interval_secs,
         }
     }
 
@@ -115,8 +141,8 @@ impl EventTask {
         }
     }
 
-    async fn tick_thread(sender: mpsc::UnboundedSender<Event>, event: Event, intervall_secs: f32) {
-        let tick_rate = Duration::from_secs_f32(intervall_secs);
+    async fn tick_thread(sender: mpsc::UnboundedSender<Event>, event: Event, interval_secs: f32) {
+        let tick_rate = Duration::from_secs_f32(interval_secs);
         let mut tick = tokio::time::interval(tick_rate);
         loop {
             let _ = sender.send(event.clone());
@@ -138,14 +164,14 @@ impl EventTask {
             EventTask::tick_thread(animation_sender, Event::AnimationTick, 0.7).await
         });
 
-        if let Some(secs) = self.git_intervall_secs {
+        if let Some(secs) = self.git_interval_secs {
             let tick_sender = self.sender.clone();
             set.spawn(
                 async move { EventTask::tick_thread(tick_sender, Event::GitTick, secs).await },
             );
         };
 
-        if let Some(secs) = self.gh_intervall_secs {
+        if let Some(secs) = self.gh_interval_secs {
             let tick_sender = self.sender.clone();
             set.spawn(
                 async move { EventTask::tick_thread(tick_sender, Event::GitHubTick, secs).await },

@@ -98,12 +98,12 @@ impl Default for App {
 impl App {
     /// Constructs a new instance of [`App`].
     pub fn new(sources: Vec<Source>) -> Self {
-        let git_intervall_secs = sources
+        let git_interval_secs = sources
             .iter()
             .find(|source| matches!(source, Source::Git(_)))
             .map(|_| 3.0);
 
-        let gh_intervall_secs = {
+        let gh_interval_secs = {
             let gh_source = sources.iter().find_map(|source| match source {
                 Source::GitHub(x) => Some(x),
                 _ => None,
@@ -117,7 +117,7 @@ impl App {
 
         Self {
             running: true,
-            events: EventHandler::new(git_intervall_secs, gh_intervall_secs),
+            events: EventHandler::new(git_interval_secs, gh_interval_secs),
             happiness: Happiness::Undecided,
             sources,
             selected: 0,
@@ -156,6 +156,7 @@ impl App {
             KeyCode::Down if key_event.kind == KeyEventKind::Press => {
                 self.happiness = Happiness::Undecided;
                 self.selected = (self.selected + 1) % self.sources.len();
+                self.events.restart();
             }
             KeyCode::Up if key_event.kind == KeyEventKind::Press => {
                 self.happiness = Happiness::Undecided;
@@ -166,6 +167,7 @@ impl App {
                         self.selected.saturating_sub(1)
                     }
                 };
+                self.events.restart();
             }
             _ => {}
         }
