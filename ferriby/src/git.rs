@@ -32,14 +32,14 @@ pub async fn get_last_event(source: GitSource) -> Option<DateTime<Utc>> {
                 }
             }
         }),
-        Err(e) => panic!("failed to get branches {}", e),
+        Err(e) => panic!("failed to get branches {e}"),
     };
 
     let mut branch_times = vec![];
 
     for branch_name in branch_names {
         let branch_reference = repo
-            .find_reference(&format!("refs/heads/{}", branch_name))
+            .find_reference(&format!("refs/heads/{branch_name}"))
             .unwrap_or_else(|e| panic!("find_reference failed: {e}"));
         let target = branch_reference
             .target()
