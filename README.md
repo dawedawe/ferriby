@@ -27,6 +27,20 @@ Use a custom config file path:
 ferriby -c config_file.json
 ```
 
+## Installation
+
+You can install ferriby from [crates.io](https://crates.io/crates/ferriby):
+
+```shell
+cargo install ferriby
+```
+
+On Arch Linux, you can install it from the [AUR](https://aur.archlinux.org/packages/ferriby):
+
+```shell
+paru -S ferriby
+```
+
 ## Configuration
 
 To access private GitHub repos and to have a higher rate limit for the checks,
