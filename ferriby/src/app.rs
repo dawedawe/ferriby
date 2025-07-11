@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
 use crate::{
-    codeberg::{self, CodebergSource},
+    codeberg::CodebergSource,
     event::{AppEvent, Event, EventHandler, IntervalSecs},
-    git::{self, GitSource},
-    github::{self, GitHubSource},
+    git::GitSource,
+    github::GitHubSource,
 };
 use chrono::{DateTime, Utc};
 use crossterm::event::KeyEventKind;
@@ -12,6 +12,10 @@ use ratatui::{
     DefaultTerminal,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
 };
+
+pub trait ActivitySource {
+    fn get_last_activity(self) -> impl Future<Output = Option<DateTime<Utc>>>;
+}
 
 #[derive(Debug, Clone)]
 pub enum Source {
@@ -199,8 +203,8 @@ impl App {
     /// Handles the tick event.
     async fn git_tick(&mut self) {
         if let Source::Git(source) = &self.sources[self.selected] {
-            let last_event = tokio::spawn(git::get_last_event(source.clone())).await;
-            match last_event {
+            let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
+            match last_activity {
                 Ok(last_event) => {
                     self.happiness = Happiness::from_last_activity(last_event);
                 }
@@ -212,8 +216,8 @@ impl App {
     /// Handles the github_tick.
     async fn github_tick(&mut self) {
         if let Source::GitHub(source) = &self.sources[self.selected] {
-            let last_event = tokio::spawn(github::get_last_event(source.clone())).await;
-            match last_event {
+            let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
+            match last_activity {
                 Ok(last_event) => {
                     self.happiness = Happiness::from_last_activity(last_event);
                 }
@@ -225,8 +229,8 @@ impl App {
     /// Handles the codeberg_tick event.
     async fn codeberg_tick(&mut self) {
         if let Source::Codeberg(source) = &self.sources[self.selected] {
-            let last_event = tokio::spawn(codeberg::get_last_event(source.clone())).await;
-            match last_event {
+            let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
+            match last_activity {
                 Ok(last_event) => {
                     self.happiness = Happiness::from_last_activity(last_event);
                 }
@@ -249,7 +253,7 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use github::GitHubSource;
+    use crate::github::GitHubSource;
 
     #[test]
     fn github_display() {
