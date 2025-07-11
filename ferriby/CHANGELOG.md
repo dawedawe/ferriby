@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/dawedawe/ferriby/compare/v0.1.1...v0.1.2) - 2025-07-11
+
+### Added
+
+- *(app)* Refactor to use a struct for all intervalls
+- *(app)* Show source case in UI
+- *(app)* Add support for codeberg sources
+
+### Other
+
+- *(readme)* add installation instructions
+- *(deps)* bump tokio from 1.46.0 to 1.46.1
+- release v0.1.1
+
 ## [0.1.1](https://github.com/dawedawe/ferriby/releases/tag/v0.1.1) - 2025-07-06
 
 ### Added
