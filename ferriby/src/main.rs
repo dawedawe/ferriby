@@ -1,10 +1,12 @@
 use crate::app::{App, Source};
+use codeberg::CodebergSource;
 use config::{Config, File};
 use git::GitSource;
 use github::GitHubSource;
 use std::env;
 
 pub mod app;
+pub mod codeberg;
 pub mod event;
 pub mod git;
 pub mod github;
@@ -31,6 +33,7 @@ async fn main() -> color_eyre::Result<()> {
 }
 
 const GH_PAT_ENV_NAME: &str = "FERRIBY_GH_PAT";
+const CB_PAT_ENV_NAME: &str = "FERRIBY_CB_PAT";
 
 fn config_path() -> String {
     env::home_dir()
@@ -91,6 +94,28 @@ fn configured_sources(path: &str) -> Result<Vec<Source>, String> {
         })
     };
 
+    let cb_config = settings.get_array("codeberg");
+    if let Ok(repos) = cb_config {
+        let pat = match std::env::var(CB_PAT_ENV_NAME) {
+            Ok(token) if !token.is_empty() => Some(token),
+            _ => None,
+        };
+        repos.iter().for_each(|repo| {
+            let repo = repo.clone().into_string().expect("expected a string");
+            let cb_args: Vec<&str> = repo.split("/").collect();
+            if cb_args.len() < 2 {
+                panic!("invalid Codeberg argument format, expected 'owner/repo'.");
+            }
+
+            let s = Source::Codeberg(CodebergSource {
+                owner: cb_args[0].to_string(),
+                repo: cb_args[1].to_string(),
+                pat: pat.clone(),
+            });
+            sources.push(s);
+        })
+    };
+
     if sources.is_empty() {
         Err("no sources defined in config file".into())
     } else {
@@ -128,6 +153,21 @@ fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
                     pat,
                 };
                 sources.push(Source::GitHub(github_source));
+            } else if chunk[0] == "-cb" {
+                let pat = match std::env::var(CB_PAT_ENV_NAME) {
+                    Ok(token) if !token.is_empty() => Some(token),
+                    _ => None,
+                };
+                let cb_args: Vec<&str> = chunk[1].split("/").collect();
+                if cb_args.len() < 2 {
+                    return Err("Invalid Codeberg argument format. Expected 'owner/repo'.".into());
+                }
+                let codeberg_source = CodebergSource {
+                    owner: cb_args[0].to_string(),
+                    repo: cb_args[1].to_string(),
+                    pat,
+                };
+                sources.push(Source::Codeberg(codeberg_source));
             } else if chunk[0] == "-g" {
                 let git_source = GitSource {
                     path: chunk[1].clone(),
@@ -145,7 +185,9 @@ fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
 }
 
 fn usage() -> ! {
-    eprintln!("Usage: ferriby [-c config_file] | [-gh owner/repository] [-g path_to_repo]");
+    eprintln!(
+        "Usage: ferriby [-c config_file] | [-g path_to_repo] [-gh owner/repository] [-cb owner/repository]"
+    );
     std::process::exit(1);
 }
 
@@ -191,7 +233,7 @@ mod tests {
             "owner1/repo1".into(),
             "-g".into(),
             "dir1/repo2".into(),
-            "-gh".into(),
+            "-cb".into(),
             "owner2/repo3".into(),
         ];
         let sources = parse_args(&args);
@@ -208,13 +250,17 @@ mod tests {
         {
             assert_eq!(owner, "owner1");
             assert_eq!(repo, "repo1");
+        } else {
+            panic!("unexpected source");
         }
 
         if let Source::Git(GitSource { path }) = &sources[1] {
             assert_eq!(path, "dir1/repo2");
+        } else {
+            panic!("unexpected source");
         }
 
-        if let Source::GitHub(GitHubSource {
+        if let Source::Codeberg(CodebergSource {
             owner,
             repo,
             pat: _,
@@ -222,6 +268,8 @@ mod tests {
         {
             assert_eq!(owner, "owner2");
             assert_eq!(repo, "repo3");
+        } else {
+            panic!("unexpected source");
         }
     }
 
@@ -246,7 +294,11 @@ mod tests {
     #[test]
     fn config_file_with_just_empty_arrays_should_err() {
         let mut temp_file = NamedTempFile::new().unwrap();
-        writeln!(temp_file, "{{ \"git\": [], \"github\": [] }}").unwrap();
+        writeln!(
+            temp_file,
+            "{{ \"git\": [], \"github\": [], \"codeberg\": [] }}"
+        )
+        .unwrap();
         temp_file.flush().unwrap();
         let path = temp_file.path().to_str().unwrap();
         let sources = configured_sources(path);
@@ -268,6 +320,10 @@ mod tests {
                     \"owner/repo1\", \
                     \"owner/repo2\", \
                     \"owner/repo3\" \
+                ], \
+                \"codeberg\": [ \
+                    \"owner/repo1\", \
+                    \"owner/repo2\" \
                 ] \
             }";
         temp_file
@@ -279,7 +335,7 @@ mod tests {
         let sources = configured_sources(path);
         match sources {
             Ok(sources) => {
-                assert_eq!(sources.len(), 5);
+                assert_eq!(sources.len(), 7);
             }
             Err(_) => assert!(sources.is_ok()),
         }
