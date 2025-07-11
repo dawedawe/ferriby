@@ -128,7 +128,7 @@ impl App {
         let happiness: String = self.happiness.into();
         let ferris = ferris(self.happiness, self.animation);
         let text = format!(
-            "Source: {}\n\
+            "{}\n\
              Happiness level: {}\n\
              {}",
             self.sources[self.selected], happiness, ferris

@@ -23,9 +23,9 @@ pub enum Source {
 impl Display for Source {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Source::Git(source) => write!(f, "{}", source.path),
-            Source::GitHub(source) => write!(f, "{}/{}", source.owner, source.repo),
-            Source::Codeberg(source) => write!(f, "{}/{}", source.owner, source.repo),
+            Source::Git(source) => write!(f, "git: {}", source.path),
+            Source::GitHub(source) => write!(f, "github: {}/{}", source.owner, source.repo),
+            Source::Codeberg(source) => write!(f, "codeberg: {}/{}", source.owner, source.repo),
         }
     }
 }
@@ -253,7 +253,7 @@ mod tests {
             pat: None,
         });
         let s = format!("{source}");
-        assert_eq!("owner_name/repo_name", s);
+        assert_eq!("github: owner_name/repo_name", s);
     }
 
     #[test]
@@ -262,7 +262,7 @@ mod tests {
             path: "abc/cde/fgh".into(),
         });
         let s = format!("{source}");
-        assert_eq!("abc/cde/fgh", s);
+        assert_eq!("git: abc/cde/fgh", s);
     }
 
     #[test]
@@ -273,6 +273,6 @@ mod tests {
             pat: None,
         });
         let s = format!("{source}");
-        assert_eq!("owner_name/repo_name", s);
+        assert_eq!("codeberg: owner_name/repo_name", s);
     }
 }
