@@ -60,10 +60,10 @@ Output ferriby.gif
 Require echo
 
 Set Shell "bash"
-Set FontSize 32
+Set FontSize 24
 Set Width 2000
-Set Height 1200
+Set Height 800
 
-Type "ferriby -gh dawedawe/ferribytestrepo -gh dawedawe/ferriby" Sleep 700ms  Enter
+Type "ferriby -gh dawedawe/ferribytestrepo -cb dawe/ferriby" Sleep 700ms  Enter
 Sleep 5s
 Down Sleep 10s
