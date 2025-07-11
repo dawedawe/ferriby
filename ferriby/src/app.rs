@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use crate::{
+    codeberg::{self, CodebergSource},
     event::{AppEvent, Event, EventHandler},
     git::{self, GitSource},
     github::{self, GitHubSource},
@@ -14,15 +15,17 @@ use ratatui::{
 
 #[derive(Debug, Clone)]
 pub enum Source {
-    GitHub(GitHubSource),
     Git(GitSource),
+    GitHub(GitHubSource),
+    Codeberg(CodebergSource),
 }
 
 impl Display for Source {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Source::GitHub(gh_source) => write!(f, "{}/{}", gh_source.owner, gh_source.repo),
-            Source::Git(git_source) => write!(f, "{}", git_source.path),
+            Source::Git(source) => write!(f, "{}", source.path),
+            Source::GitHub(source) => write!(f, "{}/{}", source.owner, source.repo),
+            Source::Codeberg(source) => write!(f, "{}/{}", source.owner, source.repo),
         }
     }
 }
@@ -86,7 +89,7 @@ impl Default for App {
     fn default() -> Self {
         Self {
             running: true,
-            events: EventHandler::new(None, None),
+            events: EventHandler::new(None, None, None),
             happiness: Happiness::Undecided,
             sources: vec![],
             selected: 0,
@@ -104,12 +107,24 @@ impl App {
             .map(|_| 3.0);
 
         let gh_interval_secs = {
-            let gh_source = sources.iter().find_map(|source| match source {
+            let source = sources.iter().find_map(|source| match source {
                 Source::GitHub(x) => Some(x),
                 _ => None,
             });
-            match gh_source {
-                Some(gh_source) if gh_source.pat.is_some() => Some(5.0),
+            match source {
+                Some(source) if source.pat.is_some() => Some(5.0),
+                Some(_) => Some(60.0),
+                _ => None,
+            }
+        };
+
+        let cb_interval_secs = {
+            let source = sources.iter().find_map(|source| match source {
+                Source::Codeberg(x) => Some(x),
+                _ => None,
+            });
+            match source {
+                Some(source) if source.pat.is_some() => Some(5.0),
                 Some(_) => Some(60.0),
                 _ => None,
             }
@@ -117,7 +132,7 @@ impl App {
 
         Self {
             running: true,
-            events: EventHandler::new(git_interval_secs, gh_interval_secs),
+            events: EventHandler::new(git_interval_secs, gh_interval_secs, cb_interval_secs),
             happiness: Happiness::Undecided,
             sources,
             selected: 0,
@@ -132,6 +147,7 @@ impl App {
             match self.events.next().await? {
                 Event::GitTick => self.git_tick().await,
                 Event::GitHubTick => self.github_tick().await,
+                Event::CodebergTick => self.codeberg_tick().await,
                 Event::AnimationTick => self.animation_tick(),
                 Event::Crossterm(event) => {
                     if let crossterm::event::Event::Key(key_event) = event {
@@ -174,7 +190,7 @@ impl App {
         Ok(())
     }
 
-    /// Handles the tick event of the terminal.
+    /// Handles the tick event.
     async fn git_tick(&mut self) {
         if let Source::Git(source) = &self.sources[self.selected] {
             let last_event = tokio::spawn(git::get_last_event(source.clone())).await;
@@ -187,10 +203,23 @@ impl App {
         };
     }
 
-    /// Handles the github_tick event of the terminal.
+    /// Handles the github_tick.
     async fn github_tick(&mut self) {
         if let Source::GitHub(source) = &self.sources[self.selected] {
             let last_event = tokio::spawn(github::get_last_event(source.clone())).await;
+            match last_event {
+                Ok(last_event) => {
+                    self.happiness = Happiness::from_last_activity(last_event);
+                }
+                Err(_) => self.running = false,
+            }
+        };
+    }
+
+    /// Handles the codeberg_tick event.
+    async fn codeberg_tick(&mut self) {
+        if let Source::Codeberg(source) = &self.sources[self.selected] {
+            let last_event = tokio::spawn(codeberg::get_last_event(source.clone())).await;
             match last_event {
                 Ok(last_event) => {
                     self.happiness = Happiness::from_last_activity(last_event);
@@ -223,7 +252,7 @@ mod tests {
             repo: "repo_name".into(),
             pat: None,
         });
-        let s = format!("{}", source);
+        let s = format!("{source}");
         assert_eq!("owner_name/repo_name", s);
     }
 
@@ -232,7 +261,18 @@ mod tests {
         let source = Source::Git(GitSource {
             path: "abc/cde/fgh".into(),
         });
-        let s = format!("{}", source);
+        let s = format!("{source}");
         assert_eq!("abc/cde/fgh", s);
+    }
+
+    #[test]
+    fn codeberg_display() {
+        let source = Source::Codeberg(CodebergSource {
+            owner: "owner_name".into(),
+            repo: "repo_name".into(),
+            pat: None,
+        });
+        let s = format!("{source}");
+        assert_eq!("owner_name/repo_name", s);
     }
 }

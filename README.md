@@ -1,7 +1,7 @@
 # ferriby
 
 Keep Ferrises alive and happy by feeding them commits in your repositories.  
-They can live in a local or a GitHub repository.
+They can live in a local, a GitHub or a Codeberg repository.
 
 ![Ferriby demo recording](./vhs/ferriby.gif)
 
@@ -13,6 +13,10 @@ ferriby -gh owner/repository
 
 ```shell
 ferriby -g path_to_local_repository
+```
+
+```shell
+ferriby -cb owner/repository
 ```
 
 You can use ferriby with multiple repositories at once:
@@ -67,6 +71,9 @@ The config file should look like this:
   "github": [
     "dawedawe/ratatui",
     "dawedawe/ratzilla"
+  ],
+  "codeberg": [
+    "dawe/ferriby"
   ]
 }
 ```

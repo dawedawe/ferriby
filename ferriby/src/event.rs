@@ -14,6 +14,8 @@ pub enum Event {
     GitTick,
     /// An event that is emitted when it's time to check GitHub.
     GitHubTick,
+    /// An event that is emitted when it's time to check Codeberg.
+    CodebergTick,
     /// Event emitted when it's time to animate ferris.
     AnimationTick,
     /// Crossterm events.
@@ -42,6 +44,8 @@ pub struct EventHandler {
     git_interval_secs: Option<f32>,
     /// The interval for GitHub checks.
     github_interval_secs: Option<f32>,
+    /// The interval for Codeberg checks.
+    codeberg_interval_secs: Option<f32>,
     /// Event sender channel.
     sender: mpsc::UnboundedSender<Event>,
     /// Event receiver channel.
@@ -52,13 +56,23 @@ pub struct EventHandler {
 
 impl EventHandler {
     /// Constructs a new instance of [`EventHandler`] and spawns a new thread to handle events.
-    pub fn new(git_interval_secs: Option<f32>, github_interval_secs: Option<f32>) -> Self {
+    pub fn new(
+        git_interval_secs: Option<f32>,
+        github_interval_secs: Option<f32>,
+        codeberg_interval_secs: Option<f32>,
+    ) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        let actor = EventTask::new(sender.clone(), git_interval_secs, github_interval_secs);
+        let actor = EventTask::new(
+            sender.clone(),
+            git_interval_secs,
+            github_interval_secs,
+            codeberg_interval_secs,
+        );
         let actor_task = tokio::spawn(async { actor.run().await });
         Self {
             git_interval_secs,
             github_interval_secs,
+            codeberg_interval_secs,
             sender,
             receiver,
             actor_task,
@@ -98,6 +112,7 @@ impl EventHandler {
             self.sender.clone(),
             self.git_interval_secs,
             self.github_interval_secs,
+            self.codeberg_interval_secs,
         );
         self.actor_task = tokio::spawn(async { actor.run().await });
     }
@@ -105,7 +120,7 @@ impl EventHandler {
 
 impl Default for EventHandler {
     fn default() -> Self {
-        Self::new(None, None)
+        Self::new(None, None, None)
     }
 }
 
@@ -115,6 +130,7 @@ struct EventTask {
     sender: mpsc::UnboundedSender<Event>,
     git_interval_secs: Option<f32>,
     gh_interval_secs: Option<f32>,
+    cb_interval_secs: Option<f32>,
 }
 
 impl EventTask {
@@ -123,11 +139,13 @@ impl EventTask {
         sender: mpsc::UnboundedSender<Event>,
         git_interval_secs: Option<f32>,
         gh_interval_secs: Option<f32>,
+        cb_interval_secs: Option<f32>,
     ) -> Self {
         Self {
             sender,
             git_interval_secs,
             gh_interval_secs,
+            cb_interval_secs,
         }
     }
 
@@ -176,6 +194,13 @@ impl EventTask {
             set.spawn(
                 async move { EventTask::tick_thread(tick_sender, Event::GitHubTick, secs).await },
             );
+        };
+
+        if let Some(secs) = self.cb_interval_secs {
+            let tick_sender = self.sender.clone();
+            set.spawn(async move {
+                EventTask::tick_thread(tick_sender, Event::CodebergTick, secs).await
+            });
         };
 
         let _ = set.join_all().await;
