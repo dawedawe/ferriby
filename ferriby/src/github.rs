@@ -62,7 +62,7 @@ impl ActivitySource for GitHubSource {
             Ok(response) => {
                 let bytes = response.bytes().await.expect("bytes() failed");
                 let body_str = std::str::from_utf8(&bytes).expect("from_utf8() failed");
-                let timestamps = GitHubSource::parse_timestamps(body_str.to_string());
+                let timestamps = GitHubSource::parse_timestamps(body_str);
                 timestamps.into_iter().max()
             }
             Err(_) => None,
@@ -71,13 +71,13 @@ impl ActivitySource for GitHubSource {
 }
 
 impl GitHubSource {
-    fn parse_timestamps(response: String) -> Vec<DateTime<Utc>> {
+    fn parse_timestamps(response: &str) -> Vec<DateTime<Utc>> {
         let re: LazyCell<Regex> = LazyCell::new(|| {
             Regex::new("\"timestamp\":\"(\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ)\"")
                 .unwrap()
         });
 
-        re.captures_iter(&response)
+        re.captures_iter(response)
             .map(|m| {
                 let s = m.get(1).unwrap().as_str();
                 let dt = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%SZ")
@@ -97,10 +97,8 @@ mod tests {
 
     #[test]
     fn github_parse() {
-        let s = String::from(
-            "\"timestamp\":\"2025-05-16T20:41:19Z\" bla foo\
-            \"timestamp\":\"2025-10-18T03:01:09Z\"",
-        );
+        let s = "\"timestamp\":\"2025-05-16T20:41:19Z\" bla foo\
+            \"timestamp\":\"2025-10-18T03:01:09Z\"";
         let parsed = GitHubSource::parse_timestamps(s);
 
         assert_eq!(parsed.len(), 2);
