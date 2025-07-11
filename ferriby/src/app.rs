@@ -12,6 +12,7 @@ use ratatui::{
     DefaultTerminal,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
 };
+use tokio::task::JoinError;
 
 pub trait ActivitySource {
     fn get_last_activity(self) -> impl Future<Output = Option<DateTime<Utc>>>;
@@ -200,16 +201,21 @@ impl App {
         Ok(())
     }
 
-    /// Handles the tick event.
+    /// Handle the last_activity
+    fn handle_last_activity(&mut self, last_activity: Result<Option<DateTime<Utc>>, JoinError>) {
+        match last_activity {
+            Ok(last_event) => {
+                self.happiness = Happiness::from_last_activity(last_event);
+            }
+            Err(_) => self.running = false,
+        }
+    }
+
+    /// Handles the git_tick event.
     async fn git_tick(&mut self) {
         if let Source::Git(source) = &self.sources[self.selected] {
             let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
-            match last_activity {
-                Ok(last_event) => {
-                    self.happiness = Happiness::from_last_activity(last_event);
-                }
-                Err(_) => self.running = false,
-            }
+            self.handle_last_activity(last_activity);
         };
     }
 
@@ -217,12 +223,7 @@ impl App {
     async fn github_tick(&mut self) {
         if let Source::GitHub(source) = &self.sources[self.selected] {
             let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
-            match last_activity {
-                Ok(last_event) => {
-                    self.happiness = Happiness::from_last_activity(last_event);
-                }
-                Err(_) => self.running = false,
-            }
+            self.handle_last_activity(last_activity);
         };
     }
 
@@ -230,12 +231,7 @@ impl App {
     async fn codeberg_tick(&mut self) {
         if let Source::Codeberg(source) = &self.sources[self.selected] {
             let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
-            match last_activity {
-                Ok(last_event) => {
-                    self.happiness = Happiness::from_last_activity(last_event);
-                }
-                Err(_) => self.running = false,
-            }
+            self.handle_last_activity(last_activity);
         };
     }
 
