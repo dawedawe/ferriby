@@ -37,15 +37,22 @@ pub enum AppEvent {
     Quit,
 }
 
+/// The intervals of the sources
+#[derive(Clone, Debug, Default)]
+pub struct IntervalSecs {
+    /// The interval for git checks.
+    pub git: Option<f32>,
+    /// The interval for GitHub checks.
+    pub github: Option<f32>,
+    /// The interval for Codeberg checks.
+    pub codeberg: Option<f32>,
+}
+
 /// Terminal event handler.
 #[derive(Debug)]
 pub struct EventHandler {
-    /// The interval for git checks.
-    git_interval_secs: Option<f32>,
-    /// The interval for GitHub checks.
-    github_interval_secs: Option<f32>,
-    /// The interval for Codeberg checks.
-    codeberg_interval_secs: Option<f32>,
+    /// The intervals
+    interval_secs: IntervalSecs,
     /// Event sender channel.
     sender: mpsc::UnboundedSender<Event>,
     /// Event receiver channel.
@@ -56,23 +63,12 @@ pub struct EventHandler {
 
 impl EventHandler {
     /// Constructs a new instance of [`EventHandler`] and spawns a new thread to handle events.
-    pub fn new(
-        git_interval_secs: Option<f32>,
-        github_interval_secs: Option<f32>,
-        codeberg_interval_secs: Option<f32>,
-    ) -> Self {
+    pub fn new(interval_secs: IntervalSecs) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        let actor = EventTask::new(
-            sender.clone(),
-            git_interval_secs,
-            github_interval_secs,
-            codeberg_interval_secs,
-        );
+        let actor = EventTask::new(sender.clone(), interval_secs.clone());
         let actor_task = tokio::spawn(async { actor.run().await });
         Self {
-            git_interval_secs,
-            github_interval_secs,
-            codeberg_interval_secs,
+            interval_secs,
             sender,
             receiver,
             actor_task,
@@ -108,19 +104,15 @@ impl EventHandler {
     /// Restart the EventTask actor to have fast updates after a change of the selected source
     pub fn restart(&mut self) {
         self.actor_task.abort();
-        let actor = EventTask::new(
-            self.sender.clone(),
-            self.git_interval_secs,
-            self.github_interval_secs,
-            self.codeberg_interval_secs,
-        );
+        let actor = EventTask::new(self.sender.clone(), self.interval_secs.clone());
         self.actor_task = tokio::spawn(async { actor.run().await });
     }
 }
 
 impl Default for EventHandler {
     fn default() -> Self {
-        Self::new(None, None, None)
+        let intervals = IntervalSecs::default();
+        Self::new(intervals)
     }
 }
 
@@ -128,24 +120,15 @@ impl Default for EventHandler {
 struct EventTask {
     /// Event sender channel.
     sender: mpsc::UnboundedSender<Event>,
-    git_interval_secs: Option<f32>,
-    gh_interval_secs: Option<f32>,
-    cb_interval_secs: Option<f32>,
+    interval_secs: IntervalSecs,
 }
 
 impl EventTask {
     /// Constructs a new instance of [`EventThread`].
-    fn new(
-        sender: mpsc::UnboundedSender<Event>,
-        git_interval_secs: Option<f32>,
-        gh_interval_secs: Option<f32>,
-        cb_interval_secs: Option<f32>,
-    ) -> Self {
+    fn new(sender: mpsc::UnboundedSender<Event>, interval_secs: IntervalSecs) -> Self {
         Self {
             sender,
-            git_interval_secs,
-            gh_interval_secs,
-            cb_interval_secs,
+            interval_secs,
         }
     }
 
@@ -182,21 +165,21 @@ impl EventTask {
             EventTask::tick_thread(animation_sender, Event::AnimationTick, 0.7).await
         });
 
-        if let Some(secs) = self.git_interval_secs {
+        if let Some(secs) = self.interval_secs.git {
             let tick_sender = self.sender.clone();
             set.spawn(
                 async move { EventTask::tick_thread(tick_sender, Event::GitTick, secs).await },
             );
         };
 
-        if let Some(secs) = self.gh_interval_secs {
+        if let Some(secs) = self.interval_secs.github {
             let tick_sender = self.sender.clone();
             set.spawn(
                 async move { EventTask::tick_thread(tick_sender, Event::GitHubTick, secs).await },
             );
         };
 
-        if let Some(secs) = self.cb_interval_secs {
+        if let Some(secs) = self.interval_secs.codeberg {
             let tick_sender = self.sender.clone();
             set.spawn(async move {
                 EventTask::tick_thread(tick_sender, Event::CodebergTick, secs).await

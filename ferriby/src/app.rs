@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{
     codeberg::{self, CodebergSource},
-    event::{AppEvent, Event, EventHandler},
+    event::{AppEvent, Event, EventHandler, IntervalSecs},
     git::{self, GitSource},
     github::{self, GitHubSource},
 };
@@ -89,7 +89,7 @@ impl Default for App {
     fn default() -> Self {
         Self {
             running: true,
-            events: EventHandler::new(None, None, None),
+            events: EventHandler::new(IntervalSecs::default()),
             happiness: Happiness::Undecided,
             sources: vec![],
             selected: 0,
@@ -130,9 +130,15 @@ impl App {
             }
         };
 
+        let intervals = IntervalSecs {
+            git: git_interval_secs,
+            github: gh_interval_secs,
+            codeberg: cb_interval_secs,
+        };
+
         Self {
             running: true,
-            events: EventHandler::new(git_interval_secs, gh_interval_secs, cb_interval_secs),
+            events: EventHandler::new(intervals),
             happiness: Happiness::Undecided,
             sources,
             selected: 0,
