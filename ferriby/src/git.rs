@@ -3,7 +3,7 @@ use git2::{BranchType, Repository, RepositoryOpenFlags};
 
 use crate::app::ActivitySource;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GitSource {
     pub path: String,
 }

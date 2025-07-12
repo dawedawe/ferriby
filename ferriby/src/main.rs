@@ -1,6 +1,6 @@
 use crate::app::{App, Source};
 use codeberg::CodebergSource;
-use config::{Config, File};
+use config::{Config, File, Value};
 use git::GitSource;
 use github::GitHubSource;
 use std::env;
@@ -72,55 +72,79 @@ fn configured_sources(path: &str) -> Result<Vec<Source>, String> {
         })
     };
 
-    let gh_config = settings.get_array("github");
-    if let Ok(repos) = gh_config {
-        let pat = match std::env::var(GH_PAT_ENV_NAME) {
-            Ok(token) if !token.is_empty() => Some(token),
-            _ => None,
-        };
-        repos.iter().for_each(|repo| {
-            let repo = repo.clone().into_string().expect("expected a string");
-            let gh_args: Vec<&str> = repo.split("/").collect();
-            if gh_args.len() < 2 {
-                panic!("invalid GitHub argument format, expected 'owner/repo'.");
-            }
-
-            let s = Source::GitHub(GitHubSource {
-                owner: gh_args[0].to_string(),
-                repo: gh_args[1].to_string(),
+    handle_git_hoster_config(
+        &settings,
+        &mut sources,
+        "github",
+        GH_PAT_ENV_NAME,
+        |owner, repo, pat| {
+            Source::GitHub(GitHubSource {
+                owner,
+                repo,
                 pat: pat.clone(),
-            });
-            sources.push(s);
-        })
-    };
+            })
+        },
+    );
 
-    let cb_config = settings.get_array("codeberg");
-    if let Ok(repos) = cb_config {
-        let pat = match std::env::var(CB_PAT_ENV_NAME) {
-            Ok(token) if !token.is_empty() => Some(token),
-            _ => None,
-        };
-        repos.iter().for_each(|repo| {
-            let repo = repo.clone().into_string().expect("expected a string");
-            let cb_args: Vec<&str> = repo.split("/").collect();
-            if cb_args.len() < 2 {
-                panic!("invalid Codeberg argument format, expected 'owner/repo'.");
-            }
-
-            let s = Source::Codeberg(CodebergSource {
-                owner: cb_args[0].to_string(),
-                repo: cb_args[1].to_string(),
+    handle_git_hoster_config(
+        &settings,
+        &mut sources,
+        "codeberg",
+        CB_PAT_ENV_NAME,
+        |owner, repo, pat| {
+            Source::Codeberg(CodebergSource {
+                owner,
+                repo,
                 pat: pat.clone(),
-            });
-            sources.push(s);
-        })
-    };
+            })
+        },
+    );
 
     if sources.is_empty() {
         Err("no sources defined in config file".into())
     } else {
         Ok(sources)
     }
+}
+
+fn handle_git_hoster_config<F>(
+    settings: &Config,
+    sources: &mut Vec<Source>,
+    key: &str,
+    pat_env_var: &str,
+    f: F,
+) where
+    F: Fn(String, String, Option<String>) -> Source,
+{
+    let cb_config = settings.get_array(key);
+    if let Ok(repos) = cb_config {
+        let pat = try_get_pat(pat_env_var);
+        repos.iter().for_each(|conf_val| {
+            let (owner, repo) = parse_owner_repo_conf_value(conf_val);
+            let s = f(owner, repo, pat.clone());
+            sources.push(s);
+        })
+    };
+}
+
+fn try_get_pat(env_var: &str) -> Option<String> {
+    match std::env::var(env_var) {
+        Ok(token) if !token.is_empty() => Some(token),
+        _ => None,
+    }
+}
+
+fn parse_owner_repo(val: &str) -> (String, String) {
+    let parts: Vec<&str> = val.split("/").collect();
+    if parts.len() != 2 {
+        panic!("invalid argument format, expected 'owner/repo'.");
+    }
+    (parts[0].to_string(), parts[1].to_string())
+}
+
+fn parse_owner_repo_conf_value(conf_val: &Value) -> (String, String) {
+    let val = conf_val.clone().into_string().expect("expected a string");
+    parse_owner_repo(&val)
 }
 
 fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
@@ -143,30 +167,16 @@ fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
                     Ok(token) if !token.is_empty() => Some(token),
                     _ => None,
                 };
-                let gh_arg: Vec<&str> = chunk[1].split("/").collect();
-                if gh_arg.len() < 2 {
-                    return Err("Invalid GitHub argument format. Expected 'owner/repo'.".into());
-                }
-                let github_source = GitHubSource {
-                    owner: gh_arg[0].to_string(),
-                    repo: gh_arg[1].to_string(),
-                    pat,
-                };
+                let (owner, repo) = parse_owner_repo(&chunk[1]);
+                let github_source = GitHubSource { owner, repo, pat };
                 sources.push(Source::GitHub(github_source));
             } else if chunk[0] == "-cb" {
                 let pat = match std::env::var(CB_PAT_ENV_NAME) {
                     Ok(token) if !token.is_empty() => Some(token),
                     _ => None,
                 };
-                let cb_args: Vec<&str> = chunk[1].split("/").collect();
-                if cb_args.len() < 2 {
-                    return Err("Invalid Codeberg argument format. Expected 'owner/repo'.".into());
-                }
-                let codeberg_source = CodebergSource {
-                    owner: cb_args[0].to_string(),
-                    repo: cb_args[1].to_string(),
-                    pat,
-                };
+                let (owner, repo) = parse_owner_repo(&chunk[1]);
+                let codeberg_source = CodebergSource { owner, repo, pat };
                 sources.push(Source::Codeberg(codeberg_source));
             } else if chunk[0] == "-g" {
                 let git_source = GitSource {
@@ -317,13 +327,13 @@ mod tests {
                     \"mi/mu/meh\" \
                 ], \
                 \"github\": [ \
-                    \"owner/repo1\", \
-                    \"owner/repo2\", \
-                    \"owner/repo3\" \
+                    \"gh_owner1/gh_repo1\", \
+                    \"gh_owner2/gh_repo2\", \
+                    \"gh_owner3/gh_repo3\" \
                 ], \
                 \"codeberg\": [ \
-                    \"owner/repo1\", \
-                    \"owner/repo2\" \
+                    \"cb_owner1/cb_repo1\", \
+                    \"cb_owner2/cb_repo2\" \
                 ] \
             }";
         temp_file
@@ -336,8 +346,53 @@ mod tests {
         match sources {
             Ok(sources) => {
                 assert_eq!(sources.len(), 7);
+                let g1_find = sources
+                    .iter()
+                    .find(|source| matches!(source, Source::Git(g) if g.path == "foo/bar/baz"));
+                assert!(g1_find.is_some());
+
+                let gh2_find = sources.iter().find(
+                    |source| matches!(source, Source::GitHub(gh) if gh.owner == "gh_owner2" && gh.repo == "gh_repo2"),
+                );
+                assert!(gh2_find.is_some());
+
+                let cb1_find = sources.iter().find(
+                    |source| matches!(source, Source::Codeberg(cb) if cb.owner == "cb_owner1" && cb.repo == "cb_repo1"),
+                );
+                assert!(cb1_find.is_some());
+                let cb2_find = sources.iter().find(
+                    |source| matches!(source, Source::Codeberg(cb) if cb.owner == "cb_owner2" && cb.repo == "cb_repo2"),
+                );
+                assert!(cb2_find.is_some());
             }
             Err(_) => assert!(sources.is_ok()),
+        }
+    }
+
+    #[test]
+    fn try_get_pat_works_with_filled_env_var() {
+        let key = "FERRIBY_TEST_PAT_XYZ";
+        let value = "xyz";
+        unsafe {
+            env::set_var(key, value);
+        }
+        let pat = try_get_pat(key);
+        assert!(pat.is_some_and(|p| p == value));
+        unsafe {
+            env::remove_var(key);
+        }
+    }
+
+    #[test]
+    fn try_get_pat_returns_none_for_empty_env_var() {
+        let key = "FERRIBY_TEST_PAT_EMPTY";
+        unsafe {
+            env::set_var(key, "");
+        }
+        let pat = try_get_pat(key);
+        assert!(pat.is_none());
+        unsafe {
+            env::remove_var(key);
         }
     }
 }
