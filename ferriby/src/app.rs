@@ -18,7 +18,7 @@ pub trait ActivitySource {
     fn get_last_activity(self) -> impl Future<Output = Option<DateTime<Utc>>>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Source {
     Git(GitSource),
     GitHub(GitHubSource),

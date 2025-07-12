@@ -7,7 +7,7 @@ use reqwest::Url;
 
 use crate::app::ActivitySource;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CodebergSource {
     pub owner: String,
     pub repo: String,
