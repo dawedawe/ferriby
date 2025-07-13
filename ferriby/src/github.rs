@@ -2,11 +2,12 @@ use std::cell::LazyCell;
 
 use chrono::NaiveDateTime;
 use chrono::{DateTime, offset::Utc};
-use http::{self, Method, header};
+use http::{HeaderMap, header};
 use regex::Regex;
 use reqwest::Url;
 
 use crate::app::ActivitySource;
+use crate::githoster::get_with_headers;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GitHubSource {
@@ -32,9 +33,8 @@ impl ActivitySource for GitHubSource {
             self.owner, self.repo
         );
         let url = Url::parse(url.as_str()).expect("Url creation failed");
-        let mut request = reqwest::Request::new(Method::GET, url);
 
-        let headers = request.headers_mut();
+        let mut headers: HeaderMap = HeaderMap::new();
         headers.insert(
             header::USER_AGENT,
             header::HeaderValue::from_static("ferriby"),
@@ -53,19 +53,12 @@ impl ActivitySource for GitHubSource {
             headers.insert(header::AUTHORIZATION, gh_pat);
         }
 
-        let client = reqwest::Client::new();
-        match client
-            .execute(request)
-            .await
-            .and_then(|r| r.error_for_status())
-        {
-            Ok(response) => {
-                let bytes = response.bytes().await.expect("bytes() failed");
-                let body_str = std::str::from_utf8(&bytes).expect("from_utf8() failed");
-                let timestamps = GitHubSource::parse_timestamps(body_str);
+        match get_with_headers(url, headers).await {
+            Some(body) => {
+                let timestamps = GitHubSource::parse_timestamps(body.as_str());
                 timestamps.into_iter().max()
             }
-            Err(_) => None,
+            None => None,
         }
     }
 }

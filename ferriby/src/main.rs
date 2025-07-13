@@ -9,6 +9,7 @@ pub mod app;
 pub mod codeberg;
 pub mod event;
 pub mod git;
+pub mod githoster;
 pub mod github;
 pub mod ui;
 
