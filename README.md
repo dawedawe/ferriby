@@ -59,7 +59,8 @@ FERRIBY_GH_PAT="xyz" ferriby -gh owner/repository
 It is strongly recommended to do this. Otherwise you are rate limited to 60 checks per hour.
 
 
-ferriby looks for a config file in `$HOME/.config/ferriby/config.json`. You can override that path with the `-c` argument.
+ferriby looks for a config file in `$HOME/.config/ferriby/config.json` (`$HOME/AppData/Roaming/ferriby/config.json` on Windows).
+You can override that path with the `-c` argument.
 The config file should look like this:
 
 ```json
