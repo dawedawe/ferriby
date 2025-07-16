@@ -15,16 +15,6 @@ pub struct CodebergSource {
     pub pat: Option<String>,
 }
 
-impl Default for CodebergSource {
-    fn default() -> Self {
-        Self {
-            owner: "rust-lang".into(),
-            repo: "rust".into(),
-            pat: None,
-        }
-    }
-}
-
 impl ActivitySource for CodebergSource {
     async fn get_last_activity(self) -> Option<DateTime<Utc>> {
         let url = format!(
@@ -43,9 +33,9 @@ impl ActivitySource for CodebergSource {
             header::HeaderValue::from_static("application/json"),
         );
         if let Some(token) = &self.pat {
-            let cb_pat = header::HeaderValue::from_str(format!("token {token}").as_str())
+            let pat = header::HeaderValue::from_str(format!("token {token}").as_str())
                 .expect("bad codeberg pat");
-            headers.insert(header::AUTHORIZATION, cb_pat);
+            headers.insert(header::AUTHORIZATION, pat);
         }
 
         match get_with_headers(url, headers).await {

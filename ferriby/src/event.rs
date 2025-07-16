@@ -14,6 +14,8 @@ pub enum Event {
     GitTick,
     /// An event that is emitted when it's time to check GitHub.
     GitHubTick,
+    /// An event that is emitted when it's time to check GitLab.
+    GitLabTick,
     /// An event that is emitted when it's time to check Codeberg.
     CodebergTick,
     /// Event emitted when it's time to animate ferris.
@@ -44,6 +46,8 @@ pub struct IntervalSecs {
     pub git: Option<f32>,
     /// The interval for GitHub checks.
     pub github: Option<f32>,
+    /// The interval for GitLab checks.
+    pub gitlab: Option<f32>,
     /// The interval for Codeberg checks.
     pub codeberg: Option<f32>,
 }
@@ -176,6 +180,13 @@ impl EventTask {
             let tick_sender = self.sender.clone();
             set.spawn(
                 async move { EventTask::tick_thread(tick_sender, Event::GitHubTick, secs).await },
+            );
+        };
+
+        if let Some(secs) = self.interval_secs.gitlab {
+            let tick_sender = self.sender.clone();
+            set.spawn(
+                async move { EventTask::tick_thread(tick_sender, Event::GitLabTick, secs).await },
             );
         };
 
