@@ -5,6 +5,7 @@ use crate::{
     event::{AppEvent, Event, EventHandler, IntervalSecs},
     git::GitSource,
     github::GitHubSource,
+    gitlab::GitLabSource,
 };
 use chrono::{DateTime, Utc};
 use crossterm::event::KeyEventKind;
@@ -22,6 +23,7 @@ pub trait ActivitySource {
 pub enum Source {
     Git(GitSource),
     GitHub(GitHubSource),
+    GitLab(GitLabSource),
     Codeberg(CodebergSource),
 }
 
@@ -30,6 +32,9 @@ impl Display for Source {
         match self {
             Source::Git(source) => write!(f, "git: {}", source.path),
             Source::GitHub(source) => write!(f, "github: {}/{}", source.owner, source.repo),
+            Source::GitLab(source) => {
+                write!(f, "{}: {}", source.hostname, source.project_name)
+            }
             Source::Codeberg(source) => write!(f, "codeberg: {}/{}", source.owner, source.repo),
         }
     }
@@ -123,6 +128,18 @@ impl App {
             }
         };
 
+        let gl_interval_secs = {
+            let source = sources.iter().find_map(|source| match source {
+                Source::GitLab(x) => Some(x),
+                _ => None,
+            });
+            match source {
+                Some(source) if source.pat.is_some() => Some(5.0),
+                Some(_) => Some(60.0),
+                _ => None,
+            }
+        };
+
         let cb_interval_secs = {
             let source = sources.iter().find_map(|source| match source {
                 Source::Codeberg(x) => Some(x),
@@ -138,6 +155,7 @@ impl App {
         let intervals = IntervalSecs {
             git: git_interval_secs,
             github: gh_interval_secs,
+            gitlab: gl_interval_secs,
             codeberg: cb_interval_secs,
         };
 
@@ -158,6 +176,7 @@ impl App {
             match self.events.next().await? {
                 Event::GitTick => self.git_tick().await,
                 Event::GitHubTick => self.github_tick().await,
+                Event::GitLabTick => self.gitlab_tick().await,
                 Event::CodebergTick => self.codeberg_tick().await,
                 Event::AnimationTick => self.animation_tick(),
                 Event::Crossterm(event) => {
@@ -222,6 +241,14 @@ impl App {
     /// Handles the github_tick.
     async fn github_tick(&mut self) {
         if let Source::GitHub(source) = &self.sources[self.selected] {
+            let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
+            self.handle_last_activity(last_activity);
+        };
+    }
+
+    /// Handles the gitlab_tick.
+    async fn gitlab_tick(&mut self) {
+        if let Source::GitLab(source) = &self.sources[self.selected] {
             let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
             self.handle_last_activity(last_activity);
         };

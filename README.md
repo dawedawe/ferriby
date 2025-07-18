@@ -1,22 +1,26 @@
 # ferriby
 
 Keep Ferrises alive and happy by feeding them commits in your repositories.  
-They can live in a local, a GitHub or a Codeberg repository.
+They can live in a local repository, at GitHub, at Codeberg or at a GitLab instance.
 
 ![Ferriby demo recording](./vhs/ferriby.gif)
 
 ## Usage
 
 ```shell
-ferriby -gh owner/repository
+ferriby -gh owner/repository # GitHub repository
 ```
 
 ```shell
-ferriby -g path_to_local_repository
+ferriby -g path_to_local_repository # local git repository
 ```
 
 ```shell
-ferriby -cb owner/repository
+ferriby -cb owner/repository # Codeberg repository
+```
+
+```shell
+ferriby -gl gitlab.example.org/12345/projectname # GitLab repository
 ```
 
 You can use ferriby with multiple repositories at once:
@@ -57,29 +61,43 @@ FERRIBY_GH_PAT="xyz" ferriby -gh owner/repository
 ```
 
 It is strongly recommended to do this. Otherwise you are rate limited to 60 checks per hour.
-
+Use the env var FERRIBY_CB_PAT for Codeberg and FERRIBY_GL_PAT for GitLab.
+Please be aware that a GitLab PAT in the env overwrites the GitLab pats for all GitLab instances in the config file.
+So if you have different GitLab instances in your config, you should not use a PAT in the env.
 
 ferriby looks for a config file in `$HOME/.config/ferriby/config.json` (`$HOME/AppData/Roaming/ferriby/config.json` on Windows).
 You can override that path with the `-c` argument.
 The config file should look like this:
 
-```json
+```
 {
-  "git": [
-    "/home/dawe/src/ferriby",
-    "/home/dawe/src/tusistor"
-  ],
-  "github": [
-    "dawedawe/ratatui",
-    "dawedawe/ratzilla"
-  ],
-  "codeberg": [
-    "dawe/ferriby"
+  "git": ["/home/dawe/src/ferriby", "/home/dawe/src/tusistor"],
+  "github": ["dawedawe/ratatui", "dawedawe/ratzilla"],
+  "codeberg": ["dawe/ferriby"],
+  "gitlab": [
+    {
+      "hostname": "gitlab.com",
+      "projectid": "71627370",
+      "projectname": "ferriby",
+      "pat": "glpat-123"
+    },
+    {
+      "hostname": "gitlab.archlinux.org",
+      "projectid": "98879",
+      "projectname": "dawe/signstar"
+    }
   ]
 }
 ```
 
 At least one repository needs to be configured. The json needs to be clean, no trailing commas allowed.
+
+### GitLab
+
+As GitLab uses numeric IDs to identify repositories in their API, we need to provide that. You can find that in the project settings.
+The `projectname` is just for us mortals and can include the user or group, too (see the example above).
+You can define a project-specific PAT in the config. It only needs the `read_api` scope.
+If you want to use `gitlab.com`, don't include the "www" in the config.
 
 ## Advisory
 

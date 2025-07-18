@@ -8,12 +8,6 @@ pub struct GitSource {
     pub path: String,
 }
 
-impl Default for GitSource {
-    fn default() -> Self {
-        Self { path: ".".into() }
-    }
-}
-
 impl ActivitySource for GitSource {
     async fn get_last_activity(self) -> Option<DateTime<Utc>> {
         let repo = match Repository::open_ext(

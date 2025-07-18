@@ -10,17 +10,18 @@ use crate::app::ActivitySource;
 use crate::githoster::get_with_headers;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct GitHubSource {
-    pub owner: String,
-    pub repo: String,
+pub struct GitLabSource {
+    pub hostname: String,
+    pub project_id: String,
+    pub project_name: String,
     pub pat: Option<String>,
 }
 
-impl ActivitySource for GitHubSource {
+impl ActivitySource for GitLabSource {
     async fn get_last_activity(self) -> Option<DateTime<Utc>> {
         let url = format!(
-            "https://api.github.com/repos/{}/{}/activity",
-            self.owner, self.repo
+            "https://{}/api/v4/projects/{}/events",
+            self.hostname, self.project_id
         );
         let url = Url::parse(url.as_str()).expect("Url creation failed");
 
@@ -31,21 +32,16 @@ impl ActivitySource for GitHubSource {
         );
         headers.insert(
             header::ACCEPT,
-            header::HeaderValue::from_static("application/vnd.github+json"),
-        );
-        headers.insert(
-            "X-GitHub-Api-Version",
-            header::HeaderValue::from_static("2022-11-28"),
+            header::HeaderValue::from_static("application/json"),
         );
         if let Some(token) = &self.pat {
-            let pat = header::HeaderValue::from_str(format!("Bearer {token}").as_str())
-                .expect("bad github pat");
-            headers.insert(header::AUTHORIZATION, pat);
+            let pat = header::HeaderValue::from_str(token.as_str()).expect("bad gitlab pat");
+            headers.insert("PRIVATE-TOKEN", pat);
         }
 
         match get_with_headers(url, headers).await {
             Some(body) => {
-                let timestamps = GitHubSource::parse_timestamps(body.as_str());
+                let timestamps = GitLabSource::parse_timestamps(body.as_str());
                 timestamps.into_iter().max()
             }
             None => None,
@@ -53,17 +49,19 @@ impl ActivitySource for GitHubSource {
     }
 }
 
-impl GitHubSource {
+impl GitLabSource {
     fn parse_timestamps(response: &str) -> Vec<DateTime<Utc>> {
         let re: LazyCell<Regex> = LazyCell::new(|| {
-            Regex::new("\"timestamp\":\"(\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ)\"")
-                .unwrap()
+            Regex::new(
+                "\"created_at\":\"(\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\dZ)\"",
+            )
+            .unwrap()
         });
 
         re.captures_iter(response)
             .map(|m| {
                 let s = m.get(1).unwrap().as_str();
-                let dt = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%SZ")
+                let dt = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.fZ")
                     .expect("unexpected timestamp format");
                 let secs = dt.and_utc().timestamp();
                 DateTime::from_timestamp(secs, 0).expect("from_timestamp failed")
@@ -80,24 +78,24 @@ mod tests {
 
     #[test]
     fn github_parse() {
-        let s = "\"timestamp\":\"2025-05-16T20:41:19Z\" bla foo\
-            \"timestamp\":\"2025-10-18T03:01:09Z\"";
-        let parsed = GitHubSource::parse_timestamps(s);
+        let s = "\"created_at\":\"2025-07-14T21:12:15.564Z\" bla foo\
+            \"created_at\":\"2025-07-14T21:12:15.137Z\"";
+        let parsed = GitLabSource::parse_timestamps(s);
 
         assert_eq!(parsed.len(), 2);
 
         assert_eq!(parsed[0].year(), 2025);
-        assert_eq!(parsed[0].month(), 5);
-        assert_eq!(parsed[0].day(), 16);
-        assert_eq!(parsed[0].hour(), 20);
-        assert_eq!(parsed[0].minute(), 41);
-        assert_eq!(parsed[0].second(), 19);
+        assert_eq!(parsed[0].month(), 7);
+        assert_eq!(parsed[0].day(), 14);
+        assert_eq!(parsed[0].hour(), 21);
+        assert_eq!(parsed[0].minute(), 12);
+        assert_eq!(parsed[0].second(), 15);
 
         assert_eq!(parsed[1].year(), 2025);
-        assert_eq!(parsed[1].month(), 10);
-        assert_eq!(parsed[1].day(), 18);
-        assert_eq!(parsed[1].hour(), 3);
-        assert_eq!(parsed[1].minute(), 1);
-        assert_eq!(parsed[1].second(), 9);
+        assert_eq!(parsed[1].month(), 7);
+        assert_eq!(parsed[1].day(), 14);
+        assert_eq!(parsed[1].hour(), 21);
+        assert_eq!(parsed[1].minute(), 12);
+        assert_eq!(parsed[1].second(), 15);
     }
 }

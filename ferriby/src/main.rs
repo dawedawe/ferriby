@@ -3,6 +3,7 @@ use codeberg::CodebergSource;
 use config::{Config, File, Value};
 use git::GitSource;
 use github::GitHubSource;
+use gitlab::GitLabSource;
 use std::env;
 
 pub mod app;
@@ -11,6 +12,7 @@ pub mod event;
 pub mod git;
 pub mod githoster;
 pub mod github;
+pub mod gitlab;
 pub mod ui;
 
 #[tokio::main]
@@ -33,8 +35,9 @@ async fn main() -> color_eyre::Result<()> {
     }
 }
 
-const GH_PAT_ENV_NAME: &str = "FERRIBY_GH_PAT";
 const CB_PAT_ENV_NAME: &str = "FERRIBY_CB_PAT";
+const GH_PAT_ENV_NAME: &str = "FERRIBY_GH_PAT";
+const GL_PAT_ENV_NAME: &str = "FERRIBY_GL_PAT";
 
 fn config_path() -> String {
     env::home_dir()
@@ -100,6 +103,47 @@ fn configured_sources(path: &str) -> Result<Vec<Source>, String> {
             })
         },
     );
+
+    let gitlab_config = settings.get_array("gitlab");
+    if let Ok(tables) = gitlab_config {
+        let pat = try_get_pat(GL_PAT_ENV_NAME);
+
+        tables.iter().for_each(|table| {
+            let pat = pat.clone();
+            let table = table.clone().into_table().expect("expected a table");
+            let hostname_value = table
+                .get("hostname")
+                .expect("expected a hostname key")
+                .clone();
+            let hostname = hostname_value.into_string().expect("expected a string");
+            let project_id_value = table
+                .get("projectid")
+                .expect("expected a projectid key")
+                .clone();
+            let project_id = project_id_value.into_string().expect("expected a string");
+            let project_name_value = table
+                .get("projectname")
+                .expect("expected a projectname key")
+                .clone();
+            let project_name = project_name_value.into_string().expect("expected a string");
+
+            let pat = if pat.is_none() {
+                table
+                    .get("pat")
+                    .map(|v| v.clone().into_string().expect("expected a string"))
+            } else {
+                pat
+            };
+
+            let source = Source::GitLab(GitLabSource {
+                hostname,
+                project_id,
+                project_name,
+                pat,
+            });
+            sources.push(source);
+        })
+    };
 
     if sources.is_empty() {
         Err("no sources defined in config file".into())
@@ -169,21 +213,37 @@ fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
                     _ => None,
                 };
                 let (owner, repo) = parse_owner_repo(&chunk[1]);
-                let github_source = GitHubSource { owner, repo, pat };
-                sources.push(Source::GitHub(github_source));
+                let source = GitHubSource { owner, repo, pat };
+                sources.push(Source::GitHub(source));
+            } else if chunk[0] == "-gl" {
+                let pat = match std::env::var(GL_PAT_ENV_NAME) {
+                    Ok(token) if !token.is_empty() => Some(token),
+                    _ => None,
+                };
+                let parts: Vec<&str> = chunk[1].splitn(3, "/").collect();
+                if parts.len() != 3 {
+                    panic!("invalid argument format, expected 'hostname/projectid/projectname'.");
+                }
+                let source = GitLabSource {
+                    hostname: parts[0].to_string(),
+                    project_id: parts[1].to_string(),
+                    project_name: parts[2].to_string(),
+                    pat,
+                };
+                sources.push(Source::GitLab(source));
             } else if chunk[0] == "-cb" {
                 let pat = match std::env::var(CB_PAT_ENV_NAME) {
                     Ok(token) if !token.is_empty() => Some(token),
                     _ => None,
                 };
                 let (owner, repo) = parse_owner_repo(&chunk[1]);
-                let codeberg_source = CodebergSource { owner, repo, pat };
-                sources.push(Source::Codeberg(codeberg_source));
+                let source = CodebergSource { owner, repo, pat };
+                sources.push(Source::Codeberg(source));
             } else if chunk[0] == "-g" {
-                let git_source = GitSource {
+                let source = GitSource {
                     path: chunk[1].clone(),
                 };
-                sources.push(Source::Git(git_source));
+                sources.push(Source::Git(source));
             } else if chunk[0] == "-c" {
                 return Err("-c arg can't be combined with other args".into());
             } else {
@@ -197,7 +257,7 @@ fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
 
 fn usage() -> ! {
     eprintln!(
-        "Usage: ferriby [-c config_file] | [-g path_to_repo] [-gh owner/repository] [-cb owner/repository]"
+        "Usage: ferriby [-c config_file] | [-g path_to_repo] [-gh owner/repository] [-cb owner/repository] [-gl hostname/projectid/projectname]"
     );
     std::process::exit(1);
 }
@@ -246,12 +306,14 @@ mod tests {
             "dir1/repo2".into(),
             "-cb".into(),
             "owner2/repo3".into(),
+            "-gl".into(),
+            "gitlab.com/12345/proj1".into(),
         ];
         let sources = parse_args(&args);
 
         assert!(sources.is_ok());
         let sources = sources.unwrap();
-        assert_eq!(sources.len(), 3);
+        assert_eq!(sources.len(), 4);
 
         if let Source::GitHub(GitHubSource {
             owner,
@@ -279,6 +341,20 @@ mod tests {
         {
             assert_eq!(owner, "owner2");
             assert_eq!(repo, "repo3");
+        } else {
+            panic!("unexpected source");
+        }
+
+        if let Source::GitLab(GitLabSource {
+            hostname,
+            project_id,
+            project_name,
+            pat: _,
+        }) = &sources[3]
+        {
+            assert_eq!(hostname, "gitlab.com");
+            assert_eq!(project_id, "12345");
+            assert_eq!(project_name, "proj1");
         } else {
             panic!("unexpected source");
         }
@@ -335,6 +411,9 @@ mod tests {
                 \"codeberg\": [ \
                     \"cb_owner1/cb_repo1\", \
                     \"cb_owner2/cb_repo2\" \
+                ], \
+                \"gitlab\": [ \
+                    { \"hostname\": \"gitlab.example.org\", \"projectid\": \"42\", \"projectname\": \"proj1\", \"pat\": \"glpat-123\" } \
                 ] \
             }";
         temp_file
@@ -346,7 +425,7 @@ mod tests {
         let sources = configured_sources(path);
         match sources {
             Ok(sources) => {
-                assert_eq!(sources.len(), 7);
+                assert_eq!(sources.len(), 8);
                 let g1_find = sources
                     .iter()
                     .find(|source| matches!(source, Source::Git(g) if g.path == "foo/bar/baz"));
@@ -365,6 +444,12 @@ mod tests {
                     |source| matches!(source, Source::Codeberg(cb) if cb.owner == "cb_owner2" && cb.repo == "cb_repo2"),
                 );
                 assert!(cb2_find.is_some());
+
+                let gl1_find =
+                    sources.iter().find(
+                    |source| matches!(source, Source::GitLab(gl)
+                    if gl.hostname == "gitlab.example.org" && gl.project_id  == "42" && gl.project_name  == "proj1" && gl.pat  == Some("glpat-123".into())));
+                assert!(gl1_find.is_some());
             }
             Err(_) => assert!(sources.is_ok()),
         }
