@@ -1,6 +1,6 @@
 [package]
 name = "ferriby"
-version = "0.2.0"
+version = "0.3.0"
 description = "keep ferris alive by contributing to a git repo"
 readme = "../README.md"
 authors.workspace = true
