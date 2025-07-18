@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🚀 Features
+
+- *(app)* Add gitlab support
+
+### ⚙️ Miscellaneous Tasks
+
+- *(CI)* Remove release-plz, use git-cliff
+- *(App)* Refactor some config parsing code
+- *(app)* Refactor requests for reuse
+- *(docs)* Add config path on Windows
+- *(docs)* Update changelog for 0.3.0
+
 ## [0.2.0] - 2025-07-11
 
 ### 🚀 Features
