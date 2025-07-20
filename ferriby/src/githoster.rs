@@ -3,15 +3,9 @@ use reqwest::Url;
 
 pub async fn get_with_headers(url: Url, header_map: HeaderMap) -> Option<String> {
     let mut request = reqwest::Request::new(Method::GET, url);
+    request.headers_mut().extend(header_map);
 
-    header_map.into_iter().for_each(|header| {
-        request
-            .headers_mut()
-            .insert(header.0.expect("expected HeaderName"), header.1);
-    });
-
-    let client = reqwest::Client::new();
-    match client
+    match reqwest::Client::new()
         .execute(request)
         .await
         .and_then(|r| r.error_for_status())
