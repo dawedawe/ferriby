@@ -8,11 +8,11 @@ They can live in a local repository, at GitHub, at Codeberg or at a GitLab insta
 ## Usage
 
 ```shell
-ferriby -gh owner/repository # GitHub repository
+ferriby -g path_to_local_repository # local git repository
 ```
 
 ```shell
-ferriby -g path_to_local_repository # local git repository
+ferriby -gh owner/repository # GitHub repository
 ```
 
 ```shell
