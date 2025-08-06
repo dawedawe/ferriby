@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
 use crate::{
-    codeberg::CodebergSource,
     event::{AppEvent, Event, EventHandler, IntervalSecs},
+    forgejo::ForgejoSource,
     git::GitSource,
     github::GitHubSource,
     gitlab::GitLabSource,
@@ -24,7 +24,7 @@ pub enum Source {
     Git(GitSource),
     GitHub(GitHubSource),
     GitLab(GitLabSource),
-    Codeberg(CodebergSource),
+    Forgejo(ForgejoSource),
 }
 
 impl Display for Source {
@@ -35,7 +35,18 @@ impl Display for Source {
             Source::GitLab(source) => {
                 write!(f, "{}: {}", source.hostname, source.project_name)
             }
-            Source::Codeberg(source) => write!(f, "codeberg: {}/{}", source.owner, source.repo),
+            Source::Forgejo(source) => {
+                write!(
+                    f,
+                    "{}: {}/{}",
+                    source
+                        .base_url
+                        .host_str()
+                        .expect("expected a Url with host part"),
+                    source.owner,
+                    source.repo
+                )
+            }
         }
     }
 }
@@ -140,9 +151,9 @@ impl App {
             }
         };
 
-        let cb_interval_secs = {
+        let fj_interval_secs = {
             let source = sources.iter().find_map(|source| match source {
-                Source::Codeberg(x) => Some(x),
+                Source::Forgejo(x) => Some(x),
                 _ => None,
             });
             match source {
@@ -156,7 +167,7 @@ impl App {
             git: git_interval_secs,
             github: gh_interval_secs,
             gitlab: gl_interval_secs,
-            codeberg: cb_interval_secs,
+            forgejo: fj_interval_secs,
         };
 
         Self {
@@ -177,7 +188,7 @@ impl App {
                 Event::GitTick => self.git_tick().await,
                 Event::GitHubTick => self.github_tick().await,
                 Event::GitLabTick => self.gitlab_tick().await,
-                Event::CodebergTick => self.codeberg_tick().await,
+                Event::ForgejoTick => self.forgejo_tick().await,
                 Event::AnimationTick => self.animation_tick(),
                 Event::Crossterm(event) => {
                     if let crossterm::event::Event::Key(key_event) = event {
@@ -255,8 +266,8 @@ impl App {
     }
 
     /// Handles the codeberg_tick event.
-    async fn codeberg_tick(&mut self) {
-        if let Source::Codeberg(source) = &self.sources[self.selected] {
+    async fn forgejo_tick(&mut self) {
+        if let Source::Forgejo(source) = &self.sources[self.selected] {
             let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
             self.handle_last_activity(last_activity);
         };
@@ -277,6 +288,7 @@ impl App {
 mod tests {
     use super::*;
     use crate::github::GitHubSource;
+    use reqwest::Url;
 
     #[test]
     fn github_display() {
@@ -299,13 +311,14 @@ mod tests {
     }
 
     #[test]
-    fn codeberg_display() {
-        let source = Source::Codeberg(CodebergSource {
+    fn forgejo_display() {
+        let source = Source::Forgejo(ForgejoSource {
+            base_url: Url::parse("http://localhost").unwrap(),
             owner: "owner_name".into(),
             repo: "repo_name".into(),
             pat: None,
         });
         let s = format!("{source}");
-        assert_eq!("codeberg: owner_name/repo_name", s);
+        assert_eq!("localhost: owner_name/repo_name", s);
     }
 }
