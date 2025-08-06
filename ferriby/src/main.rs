@@ -1,14 +1,15 @@
 use crate::app::{App, Source};
-use codeberg::CodebergSource;
 use config::{Config, File, Value};
+use forgejo::ForgejoSource;
 use git::GitSource;
 use github::GitHubSource;
 use gitlab::GitLabSource;
+use reqwest::Url;
 use std::env;
 
 pub mod app;
-pub mod codeberg;
 pub mod event;
+pub mod forgejo;
 pub mod git;
 pub mod githoster;
 pub mod github;
@@ -35,7 +36,7 @@ async fn main() -> color_eyre::Result<()> {
     }
 }
 
-const CB_PAT_ENV_NAME: &str = "FERRIBY_CB_PAT";
+const FJ_PAT_ENV_NAME: &str = "FERRIBY_FJ_PAT";
 const GH_PAT_ENV_NAME: &str = "FERRIBY_GH_PAT";
 const GL_PAT_ENV_NAME: &str = "FERRIBY_GL_PAT";
 
@@ -90,19 +91,40 @@ fn configured_sources(path: &str) -> Result<Vec<Source>, String> {
         },
     );
 
-    handle_git_hoster_config(
-        &settings,
-        &mut sources,
-        "codeberg",
-        CB_PAT_ENV_NAME,
-        |owner, repo, pat| {
-            Source::Codeberg(CodebergSource {
+    let forgejo_config = settings.get_array("forgejo");
+    if let Ok(tables) = forgejo_config {
+        let pat = try_get_pat(FJ_PAT_ENV_NAME);
+
+        tables.iter().for_each(|table| {
+            let pat = pat.clone();
+            let table = table.clone().into_table().expect("expected a table");
+            let baseurl_value = table
+                .get("baseurl")
+                .expect("expected a baseurl key")
+                .clone();
+            let base_url = baseurl_value.into_string().expect("expected a string");
+            let base_url = Url::parse(base_url.as_str()).expect("expected a Url");
+            let repo_value = table.get("repo").expect("expected a repo key").clone();
+            let repo = repo_value.into_string().expect("expected a string");
+            let (owner, repo) = parse_owner_repo(&repo);
+
+            let pat = if pat.is_none() {
+                table
+                    .get("pat")
+                    .map(|v| v.clone().into_string().expect("expected a string"))
+            } else {
+                pat
+            };
+
+            let source = Source::Forgejo(ForgejoSource {
+                base_url,
                 owner,
                 repo,
-                pat: pat.clone(),
-            })
-        },
-    );
+                pat,
+            });
+            sources.push(source);
+        })
+    };
 
     let gitlab_config = settings.get_array("gitlab");
     if let Ok(tables) = gitlab_config {
@@ -187,6 +209,15 @@ fn parse_owner_repo(val: &str) -> (String, String) {
     (parts[0].to_string(), parts[1].to_string())
 }
 
+fn parse_url_owner_repo(val: &str) -> (Url, String, String) {
+    let parts: Vec<&str> = val.rsplitn(3, "/").collect();
+    if parts.len() != 3 {
+        panic!("invalid argument format, expected 'https://host/owner/repo'.");
+    }
+    let url = Url::parse(parts[2]).expect("expected a Url");
+    (url, parts[1].to_string(), parts[0].to_string())
+}
+
 fn parse_owner_repo_conf_value(conf_val: &Value) -> (String, String) {
     let val = conf_val.clone().into_string().expect("expected a string");
     parse_owner_repo(&val)
@@ -231,14 +262,19 @@ fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
                     pat,
                 };
                 sources.push(Source::GitLab(source));
-            } else if chunk[0] == "-cb" {
-                let pat = match std::env::var(CB_PAT_ENV_NAME) {
+            } else if chunk[0] == "-fj" {
+                let pat = match std::env::var(FJ_PAT_ENV_NAME) {
                     Ok(token) if !token.is_empty() => Some(token),
                     _ => None,
                 };
-                let (owner, repo) = parse_owner_repo(&chunk[1]);
-                let source = CodebergSource { owner, repo, pat };
-                sources.push(Source::Codeberg(source));
+                let (base_url, owner, repo) = parse_url_owner_repo(&chunk[1]);
+                let source = ForgejoSource {
+                    base_url,
+                    owner,
+                    repo,
+                    pat,
+                };
+                sources.push(Source::Forgejo(source));
             } else if chunk[0] == "-g" {
                 let source = GitSource {
                     path: chunk[1].clone(),
@@ -257,7 +293,7 @@ fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
 
 fn usage() -> ! {
     eprintln!(
-        "Usage: ferriby [-c config_file] | [-g path_to_repo] [-gh owner/repository] [-cb owner/repository] [-gl hostname/projectid/projectname]"
+        "Usage: ferriby [-c config_file] | [-g path_to_repo] [-gh owner/repository] [-fj base_url/owner/repository] [-gl hostname/projectid/projectname]"
     );
     std::process::exit(1);
 }
@@ -304,8 +340,8 @@ mod tests {
             "owner1/repo1".into(),
             "-g".into(),
             "dir1/repo2".into(),
-            "-cb".into(),
-            "owner2/repo3".into(),
+            "-fj".into(),
+            "https://codeberg.org/owner2/repo3".into(),
             "-gl".into(),
             "gitlab.com/12345/proj1".into(),
         ];
@@ -333,12 +369,14 @@ mod tests {
             panic!("unexpected source");
         }
 
-        if let Source::Codeberg(CodebergSource {
+        if let Source::Forgejo(ForgejoSource {
+            base_url,
             owner,
             repo,
             pat: _,
         }) = &sources[2]
         {
+            assert_eq!(base_url.as_str(), "https://codeberg.org/");
             assert_eq!(owner, "owner2");
             assert_eq!(repo, "repo3");
         } else {
@@ -408,9 +446,9 @@ mod tests {
                     \"gh_owner2/gh_repo2\", \
                     \"gh_owner3/gh_repo3\" \
                 ], \
-                \"codeberg\": [ \
-                    \"cb_owner1/cb_repo1\", \
-                    \"cb_owner2/cb_repo2\" \
+                \"forgejo\": [ \
+                    { \"baseurl\": \"https://codeberg.org\", \"repo\": \"cb_owner1/cb_repo1\", \"pat\": \"fjpat-123\" }, \
+                    { \"baseurl\": \"http://localhost\", \"repo\": \"cb_owner2/cb_repo2\", \"pat\": \"fjpat-456\" } \
                 ], \
                 \"gitlab\": [ \
                     { \"hostname\": \"gitlab.example.org\", \"projectid\": \"42\", \"projectname\": \"proj1\", \"pat\": \"glpat-123\" } \
@@ -436,14 +474,14 @@ mod tests {
                 );
                 assert!(gh2_find.is_some());
 
-                let cb1_find = sources.iter().find(
-                    |source| matches!(source, Source::Codeberg(cb) if cb.owner == "cb_owner1" && cb.repo == "cb_repo1"),
+                let fj1_find = sources.iter().find(
+                    |source| matches!(source, Source::Forgejo(fj) if fj.owner == "cb_owner1" && fj.repo == "cb_repo1"),
                 );
-                assert!(cb1_find.is_some());
-                let cb2_find = sources.iter().find(
-                    |source| matches!(source, Source::Codeberg(cb) if cb.owner == "cb_owner2" && cb.repo == "cb_repo2"),
+                assert!(fj1_find.is_some());
+                let fj2_find = sources.iter().find(
+                    |source| matches!(source, Source::Forgejo(fj) if fj.owner == "cb_owner2" && fj.repo == "cb_repo2"),
                 );
-                assert!(cb2_find.is_some());
+                assert!(fj2_find.is_some());
 
                 let gl1_find =
                     sources.iter().find(
