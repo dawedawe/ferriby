@@ -1,7 +1,7 @@
 # ferriby
 
 Keep Ferrises alive and happy by feeding them commits in your repositories.  
-They can live in a local repository, at GitHub, at Codeberg or at a GitLab instance.
+They can live in a local repository, at GitHub, any Forgejo instance like Codeberg or at a GitLab instance.
 
 ![Ferriby demo recording](./vhs/ferriby.gif)
 
@@ -16,7 +16,7 @@ ferriby -gh owner/repository # GitHub repository
 ```
 
 ```shell
-ferriby -cb owner/repository # Codeberg repository
+ferriby -fj https://example.org/owner/repository # Forgejo repository
 ```
 
 ```shell
