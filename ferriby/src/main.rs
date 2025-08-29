@@ -60,7 +60,7 @@ fn config_path() -> String {
         .expect("failed to determine config path")
 }
 
-fn configured_sources(path: &str) -> Result<Vec<Source>, String> {
+fn file_configured_sources(path: &str) -> Result<Vec<Source>, String> {
     let settings = Config::builder()
         .add_source(File::with_name(path))
         .build()
@@ -226,10 +226,10 @@ fn parse_owner_repo_conf_value(conf_val: &Value) -> (String, String) {
 fn parse_args(args: &[String]) -> Result<Vec<Source>, String> {
     if args.len() <= 1 {
         let path = config_path();
-        configured_sources(path.as_str())
+        file_configured_sources(path.as_str())
     } else if args.len() == 3 && args[1] == "-c" {
         let path = args[2].as_str();
-        configured_sources(path)
+        file_configured_sources(path)
     } else {
         let chunks = args[1..].chunks(2);
         let mut sources = vec![];
@@ -402,7 +402,7 @@ mod tests {
     fn empty_config_file_should_err() {
         let temp_file = NamedTempFile::new().unwrap();
         let path = temp_file.path().to_str().unwrap();
-        let sources = configured_sources(path);
+        let sources = file_configured_sources(path);
         assert!(sources.is_err());
     }
 
@@ -412,7 +412,7 @@ mod tests {
         writeln!(temp_file, "{{}}").unwrap();
         temp_file.flush().unwrap();
         let path = temp_file.path().to_str().unwrap();
-        let sources = configured_sources(path);
+        let sources = file_configured_sources(path);
         assert!(sources.is_err());
     }
 
@@ -426,7 +426,7 @@ mod tests {
         .unwrap();
         temp_file.flush().unwrap();
         let path = temp_file.path().to_str().unwrap();
-        let sources = configured_sources(path);
+        let sources = file_configured_sources(path);
         assert!(sources.is_err());
     }
 
@@ -460,7 +460,7 @@ mod tests {
         temp_file.flush().expect("flush failed");
 
         let path = temp_file.path().to_str().unwrap();
-        let sources = configured_sources(path);
+        let sources = file_configured_sources(path);
         match sources {
             Ok(sources) => {
                 assert_eq!(sources.len(), 8);

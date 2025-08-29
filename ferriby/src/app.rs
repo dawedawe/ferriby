@@ -249,7 +249,7 @@ impl App {
         };
     }
 
-    /// Handles the github_tick.
+    /// Handles the github_tick event.
     async fn github_tick(&mut self) {
         if let Source::GitHub(source) = &self.sources[self.selected] {
             let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
@@ -257,7 +257,7 @@ impl App {
         };
     }
 
-    /// Handles the gitlab_tick.
+    /// Handles the gitlab_tick event.
     async fn gitlab_tick(&mut self) {
         if let Source::GitLab(source) = &self.sources[self.selected] {
             let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
@@ -265,7 +265,7 @@ impl App {
         };
     }
 
-    /// Handles the codeberg_tick event.
+    /// Handles the forgejo_tick event.
     async fn forgejo_tick(&mut self) {
         if let Source::Forgejo(source) = &self.sources[self.selected] {
             let last_activity = tokio::spawn(source.clone().get_last_activity()).await;
