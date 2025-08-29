@@ -16,8 +16,8 @@ pub enum Event {
     GitHubTick,
     /// An event that is emitted when it's time to check GitLab.
     GitLabTick,
-    /// An event that is emitted when it's time to check Codeberg.
-    CodebergTick,
+    /// An event that is emitted when it's time to check Forgejo.
+    ForgejoTick,
     /// Event emitted when it's time to animate ferris.
     AnimationTick,
     /// Crossterm events.
@@ -48,8 +48,8 @@ pub struct IntervalSecs {
     pub github: Option<f32>,
     /// The interval for GitLab checks.
     pub gitlab: Option<f32>,
-    /// The interval for Codeberg checks.
-    pub codeberg: Option<f32>,
+    /// The interval for Forgejo checks.
+    pub forgejo: Option<f32>,
 }
 
 /// Terminal event handler.
@@ -190,10 +190,10 @@ impl EventTask {
             );
         };
 
-        if let Some(secs) = self.interval_secs.codeberg {
+        if let Some(secs) = self.interval_secs.forgejo {
             let tick_sender = self.sender.clone();
             set.spawn(async move {
-                EventTask::tick_thread(tick_sender, Event::CodebergTick, secs).await
+                EventTask::tick_thread(tick_sender, Event::ForgejoTick, secs).await
             });
         };
 
