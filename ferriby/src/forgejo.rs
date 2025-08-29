@@ -53,6 +53,20 @@ impl ForgejoSource {
     // forgejo on sqlite:     "updated_at":"2025-08-04T20:26:36Z",
     // forgejo on postgres:  "updated_at":"2025-08-09T11:51:12+02:00"
     fn parse_timestamps(response: &str) -> Vec<DateTime<Utc>> {
+        fn parse_timestamp_str(s: &str, is_utc: bool) -> DateTime<Utc> {
+            if is_utc {
+                let dt = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%SZ")
+                    .expect("unexpected timestamp format");
+                let secs = dt.and_utc().timestamp();
+                DateTime::from_timestamp(secs, 0).expect("from_timestamp failed")
+            } else {
+                let dt = chrono::DateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%z")
+                    .expect("unexpected timestamp format");
+                let secs = dt.timestamp();
+                DateTime::from_timestamp(secs, 0).expect("from_timestamp failed")
+            }
+        }
+
         let re: LazyCell<Regex> = LazyCell::new(|| {
             Regex::new("\"updated_at\":\"(\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ)\"|\"updated_at\":\"(\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d[+-]\\d\\d:\\d\\d)\"")
                 .unwrap()
@@ -60,18 +74,12 @@ impl ForgejoSource {
 
         re.captures_iter(response)
             .map(|m| {
-                if m.get(1).is_some() {
-                    let s = m.get(1).unwrap().as_str();
-                    let dt = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%SZ")
-                        .expect("unexpected timestamp format");
-                    let secs = dt.and_utc().timestamp();
-                    DateTime::from_timestamp(secs, 0).expect("from_timestamp failed")
+                if let Some(s) = m.get(1) {
+                    parse_timestamp_str(s.as_str(), true)
+                } else if let Some(s) = m.get(2) {
+                    parse_timestamp_str(s.as_str(), false)
                 } else {
-                    let s = m.get(2).unwrap().as_str();
-                    let dt = chrono::DateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%z")
-                        .expect("unexpected timestamp format");
-                    let secs = dt.timestamp();
-                    DateTime::from_timestamp(secs, 0).expect("from_timestamp failed")
+                    panic!("No matching timestamp group found")
                 }
             })
             .collect()
