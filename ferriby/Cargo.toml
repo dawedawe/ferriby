@@ -11,7 +11,7 @@ repository.workspace = true
 [dependencies]
 chrono = "0.4.41"
 color-eyre = "0.6.3"
-config = { version = "0.15.14", features = ["json"] }
+config = { version = "0.15.15", features = ["json"] }
 crossterm = { version = "0.28.1", features = ["event-stream"] }
 futures = "0.3.31"
 git2 = "0.20.2"
