@@ -9,7 +9,7 @@ edition.workspace = true
 repository.workspace = true
 
 [dependencies]
-chrono = "0.4.41"
+chrono = "0.4.42"
 color-eyre = "0.6.3"
 config = { version = "0.15.14", features = ["json"] }
 crossterm = { version = "0.28.1", features = ["event-stream"] }
