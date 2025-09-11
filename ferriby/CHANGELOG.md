@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version
+
+## [0.4.0] - 2025-09-11
+
+### 🚀 Features
+
+- *(app)* Extend codeberg support to support all forgejo instances.
+
+### 🐛 Bug Fixes
+
+- Fix some comments
+
+### 📚 Documentation
+
+- Sync and improve docs
+
+### ⚙️ Miscellaneous Tasks
+
+- *(refactor)* Refactor githoster.rs
+- *(docs)* Improve example order in README.md
+- Refactor parse_timestamps in forgejo.rs
+
+## [0.3.0] - 2025-07-18
+
 ### 🚀 Features
 
 - *(app)* Add gitlab support
