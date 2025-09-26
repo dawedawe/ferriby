@@ -10,5 +10,5 @@ steps:
       CARGO_TERM_COLOR: always
     commands:
       - rustup default $RUST
-      - cargo check
-      - cargo test
+      - cargo check -j 4
+      - cargo test -j 4
