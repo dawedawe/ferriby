@@ -23,10 +23,10 @@ impl ActivitySource for GitSource {
 
         match repo.branches(Some(BranchType::Local)) {
             Ok(branches) => branches.for_each(|b| {
-                if let Ok(b) = b {
-                    if let Ok(Some(branch_name)) = b.0.name() {
-                        branch_names.push(branch_name.to_string())
-                    }
+                if let Ok(b) = b
+                    && let Ok(Some(branch_name)) = b.0.name()
+                {
+                    branch_names.push(branch_name.to_string())
                 }
             }),
             Err(e) => panic!("failed to get branches {e}"),
