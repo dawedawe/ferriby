@@ -9,15 +9,15 @@ edition.workspace = true
 repository.workspace = true
 
 [dependencies]
-chrono = "0.4.42"
-color-eyre = "0.6.3"
-config = { version = "0.15.18", features = ["json"] }
+chrono = "0.4.45"
+color-eyre = "0.6.5"
+config = { version = "0.15.24", features = ["json"] }
 crossterm = { version = "0.29.0", features = ["event-stream"] }
-futures = "0.3.31"
-git2 = "0.20.2"
-http = "1.3.1"
-ratatui = "0.30.0"
+futures = "0.3.32"
+git2 = "0.21.0"
+http = "1.4.2"
+ratatui = "0.30.2"
 regex = "1.12.2"
-reqwest = "0.12.24"
-tempfile = "3.23.0"
-tokio = { version = "1.48.0", features = ["full"] }
+reqwest = "0.13.4"
+tempfile = "3.27.0"
+tokio = { version = "1.52.3", features = ["full"] }
