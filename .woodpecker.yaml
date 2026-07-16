@@ -5,10 +5,16 @@ steps:
   test:
     when:
       event: [push, pull_request]
+      branch: main
     image: rust
     environment:
       CARGO_TERM_COLOR: always
+      RUSTFLAGS: -Dwarnings
     commands:
       - rustup default $RUST
-      - cargo check -j 4
+      - rustup component add rustfmt
+      - cargo fmt --check
+      - cargo check --all-targets -j 4
+      - rustup component add clippy
+      - cargo clippy -j 4
       - cargo test -j 4
